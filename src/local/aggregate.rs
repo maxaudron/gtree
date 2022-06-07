@@ -20,6 +20,11 @@ impl Aggregator for Repos {
         let mut repos = Vec::new();
 
         let path: std::path::PathBuf = [root, scope].iter().collect();
+
+        if ! path.exists() {
+            return repos;
+        }
+
         let mut walker = WalkDir::new(path).into_iter();
 
         loop {
