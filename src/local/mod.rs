@@ -1,4 +1,7 @@
-use std::{fmt::Debug, path::PathBuf};
+use std::{
+    fmt::Debug,
+    path::{Path, PathBuf},
+};
 
 use thiserror::Error;
 
@@ -9,75 +12,25 @@ use crate::forge::Project;
 
 mod aggregate;
 mod repostate;
+mod sync;
 mod update;
 
 pub use aggregate::*;
 pub use repostate::*;
+pub use sync::*;
 pub use update::*;
 
 pub type Repos = Vec<Repo>;
 
 pub struct Repo {
     pub name: String,
+    pub path: PathBuf,
     pub repo: Option<Repository>,
     pub forge: Option<Project>,
     pub default_branch: String,
 }
 
 impl Repo {
-    /// Fetch any new state from the remote and fast forward merge changes into local branches
-    #[tracing::instrument(level = "trace")]
-    pub fn update(&mut self) -> Result<UpdateResult, UpdateResult> {
-        let repo_name = self.name.clone();
-        if self.repo.is_some() {
-            self.update_inner()
-                .map_err(|e| UpdateResult::err(repo_name, e.into()))
-        } else {
-            Ok(UpdateResult::err(repo_name, RepoError::NoLocalRepo))
-        }
-    }
-
-    fn update_inner(&mut self) -> Result<UpdateResult, RepoError> {
-        let repo = self.repo.as_ref().unwrap();
-        let mut remote = self.main_remote(repo)?;
-
-        self.fetch(&mut remote)?;
-
-        self.default_branch = remote.default_branch()?.as_str().unwrap().to_string();
-
-        debug!("default branch: {}", self.default_branch);
-
-        if self.is_clean()? {
-            debug!("repo is clean");
-
-            let merged = repo.branches(Some(BranchType::Local))?
-                    .filter_map(|x| x.ok())
-                    .try_fold(false, |mut merged, (mut branch, _)| {
-                        let name = format!("refs/heads/{}", Repo::branch_name(&branch));
-
-                        if branch.upstream().is_ok() {
-                            let upstream = branch.upstream().unwrap();
-
-                            debug!("branch: {}", name);
-
-                            merged |= self.merge(repo, &mut branch, &upstream)?;
-                            Ok::<bool, RepoError>(merged)
-                        } else {
-                            debug!("not updating branch: {}: branch does not have upstream tracking branch set", name);
-                            Ok(merged)
-                        }
-                    })?;
-
-            if merged {
-                Ok(UpdateResult::merged(self.name.clone()))
-            } else {
-                Ok(UpdateResult::no_changes(self.name.clone()))
-            }
-        } else {
-            Ok(UpdateResult::dirty(self.name.clone()))
-        }
-    }
-
     pub fn is_clean(&self) -> Result<bool, RepoError> {
         if let Some(repo) = &self.repo {
             debug!("repo state: {:?}", repo.state());
@@ -134,6 +87,15 @@ impl Repo {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace")]
+    pub fn clone(&self, url: &str) -> Result<Repository, RepoError> {
+        let mut builder = git2::build::RepoBuilder::new();
+        builder.fetch_options(crate::git::fetch_options());
+
+        builder.clone(url, &self.path).map_err(|err| RepoError::GitError(err))
+    }
+
+    #[tracing::instrument(level = "trace")]
     pub fn checkout(&self) -> Result<(), RepoError> {
         if let Some(repo) = &self.repo {
             repo.checkout_head(None).map_err(|e| e.into())
@@ -149,6 +111,7 @@ impl Repo {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(repo, local, upstream))]
     pub fn merge(
         &self,
         repo: &Repository,
@@ -264,6 +227,7 @@ impl Default for Repo {
     fn default() -> Self {
         Self {
             name: Default::default(),
+            path: Default::default(),
             repo: Default::default(),
             forge: Default::default(),
             default_branch: "main".to_string(),

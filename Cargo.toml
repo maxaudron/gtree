@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1", features = ["full", "rt-multi-thread"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 futures = "0.3"
 
 gitlab = "0.1408"
@@ -18,12 +18,13 @@ async-trait = "*"
 
 # Arg parsing and config
 clap = { version = "3", features = ["derive"] }
-figment = { version = "0.10", features = ["toml", "yaml", "env"] }
+figment = { version = "0.10", features = ["toml", "env"] }
 serde = "1"
 
 # logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-flame = "0.2"
 
 # error handling
 anyhow = "1"

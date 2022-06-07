@@ -11,6 +11,7 @@ use gtree::{
 };
 
 mod list;
+mod sync;
 mod update;
 
 #[derive(Derivative)]
@@ -20,11 +21,12 @@ struct GTree {
     config: config::Config,
     args: config::args::Args,
     forge: gtree::forge::Forge,
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     gitconfig: git2::Config,
 }
 
 impl GTree {
+    #[tracing::instrument(level = "trace")]
     pub async fn new() -> Result<GTree> {
         let args = config::args::Args::parse();
 
@@ -49,9 +51,11 @@ impl GTree {
         })
     }
 
+    #[tracing::instrument(level = "trace")]
     pub async fn run(self) -> Result<()> {
         let scope = self.args.scope.as_ref().map_or("", |x| x);
 
+        // TODO select a specific forge
         let (_name, forge) = self
             .config
             .iter()
@@ -60,13 +64,13 @@ impl GTree {
 
         let (local, remote) = tokio::join!(
             Repos::from_local(forge.root(), scope),
-            Repos::from_forge(self.forge.projects(scope).await?)
+            Repos::from_forge(forge.root(), self.forge.projects(scope).await?)
         );
 
         let repos = Repos::aggregate(local, remote).await;
 
         match self.args.command {
-            config::args::Commands::Sync => todo!(),
+            config::args::Commands::Sync => self.sync(repos).await,
             config::args::Commands::Update => self.update(repos).await,
             config::args::Commands::List => self.list(repos).await?,
         };
@@ -77,6 +81,8 @@ impl GTree {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    use tracing_flame::FlameLayer;
+
     let filter = tracing_subscriber::filter::Targets::new()
         .with_default(Level::TRACE)
         .with_target("hyper", LevelFilter::OFF)
@@ -84,15 +90,23 @@ async fn main() -> Result<()> {
 
     let env_filter = EnvFilter::from_default_env();
 
+    let (flame_layer, _guard) = FlameLayer::with_file("./tracing.folded").unwrap();
+    let flameguard = flame_layer.flush_on_drop();
+
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::ACTIVE))
         .with(filter)
         .with(env_filter)
+        .with(flame_layer)
         .init();
 
     debug!("starting");
 
     let gtree = GTree::new().await?;
 
-    gtree.run().await
+    gtree.run().await?;
+
+    flameguard.flush()?;
+
+    Ok(())
 }
