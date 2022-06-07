@@ -1,7 +1,9 @@
+use std::{thread, sync::Arc};
+
 use anyhow::{Context, Result};
 use clap::Parser;
-use derivative::Derivative;
 
+use tokio::runtime::Runtime;
 use tracing::{debug, metadata::LevelFilter, Level};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
 
@@ -19,18 +21,18 @@ mod update;
 #[cfg(test)]
 mod tests;
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(Debug)]
 struct GTree {
     figment: figment::Figment,
     config: config::Config,
     args: config::args::Args,
     forge: forge::Forge,
+    rt: Runtime,
 }
 
 impl GTree {
     #[tracing::instrument(level = "trace")]
-    pub async fn new() -> Result<GTree> {
+    pub fn new() -> Result<GTree> {
         let args = config::args::Args::parse();
 
         let figment = config::Config::figment()?;
@@ -41,72 +43,73 @@ impl GTree {
             .next()
             .context("No Forge configured, please setup a forge")?;
 
-        let forge = forge::Forge::new(forge_config).await?;
+        let rt = Runtime::new()?;
+
+
+        let forge = rt.block_on(forge::Forge::new(forge_config))?;
 
         Ok(GTree {
             figment,
             config,
             args,
             forge,
+            rt
         })
     }
 
     #[tracing::instrument(level = "trace")]
-    pub async fn run(self) -> Result<()> {
-        let scope = self.args.scope.as_ref().map_or("", |x| x);
+    pub fn run(self) -> Result<()> {
+        let scope = Arc::new(self.args.scope.as_ref().map_or("", |x| x).to_string());
 
         // TODO select a specific forge
-        let (_name, forge) = self
+        let forge = Arc::new(self
             .config
             .iter()
             .next()
-            .context("No Forge configured, please setup a forge")?;
+            .context("No Forge configured, please setup a forge")?.1.clone());
 
-        let (local, remote) = tokio::join!(
-            Repos::from_local(forge.root(), scope),
-            Repos::from_forge(forge.root(), self.forge.projects(scope).await?)
-        );
+        let scope_t = scope.clone();
+        let forge_t = forge.clone();
+        let handle = thread::spawn(move || {
+            Repos::from_local(&forge_t.root(), &scope_t)
+        });
 
-        let repos = Repos::aggregate(local, remote).await;
+        let projects = self.rt.block_on(self.forge.projects(&scope))?;
+        let remote = Repos::from_forge(forge.root(), projects);
+
+        let local = handle.join().unwrap();
+        let repos = Repos::aggregate(local, remote);
 
         match self.args.command {
-            config::args::Commands::Sync => self.sync(repos).await,
-            config::args::Commands::Update => self.update(repos).await,
-            config::args::Commands::List => self.list(repos).await?,
+            config::args::Commands::Sync => self.sync(repos),
+            config::args::Commands::Update => self.update(repos),
+            config::args::Commands::List => self.list(repos)?,
         };
 
         Ok(())
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    use tracing_flame::FlameLayer;
-
+fn main() -> Result<()> {
     let filter = tracing_subscriber::filter::Targets::new()
         .with_default(Level::TRACE)
+        .with_target("hyper", LevelFilter::OFF)
         .with_target("hyper", LevelFilter::OFF)
         .with_target("reqwest", LevelFilter::OFF);
 
     let env_filter = EnvFilter::from_default_env();
 
-    let (flame_layer, _guard) = FlameLayer::with_file("./tracing.folded").unwrap();
-    let flameguard = flame_layer.flush_on_drop();
-
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::ACTIVE))
         .with(filter)
         .with(env_filter)
-        .with(flame_layer)
         .init();
 
     debug!("starting");
 
-    let gtree = GTree::new().await?;
+    let gtree = GTree::new()?;
 
-    gtree.run().await?;
-
-    flameguard.flush()?;
+    gtree.run()?;
 
     Ok(())
 }

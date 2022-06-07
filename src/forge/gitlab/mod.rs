@@ -1,5 +1,4 @@
 use anyhow::Result;
-use gitlab::AsyncGitlab;
 
 use graphql_client::GraphQLQuery;
 
@@ -7,10 +6,11 @@ pub mod config;
 
 #[derive(Clone, Debug)]
 pub struct Gitlab {
-    client: AsyncGitlab,
+    client: gitlab::AsyncGitlab,
 }
 
 impl Gitlab {
+    #[tracing::instrument(level = "trace")]
     pub async fn new(host: &str, token: &str, tls: bool) -> Result<Gitlab> {
         let mut gitlab = gitlab::GitlabBuilder::new(host, token);
 
@@ -23,6 +23,7 @@ impl Gitlab {
         Ok(Gitlab { client: gitlab })
     }
 
+    #[tracing::instrument(level = "trace")]
     pub async fn from_config(forge: &config::Gitlab) -> Result<Gitlab> {
         Gitlab::new(&forge.host, &forge.token, forge.tls).await
     }

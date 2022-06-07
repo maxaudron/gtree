@@ -7,6 +7,8 @@ edition = "2021"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 futures = "0.3"
 
+itertools = "0.10"
+
 gitlab = "0.1408"
 graphql_client = "0.10"
 

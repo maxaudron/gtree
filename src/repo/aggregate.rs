@@ -1,3 +1,8 @@
+use std::{
+    collections::HashMap,
+    sync::RwLock,
+};
+
 use git2::Repository;
 
 use tracing::error;
@@ -9,16 +14,16 @@ use super::{Repo, Repos};
 
 #[async_trait::async_trait]
 pub trait Aggregator {
-    async fn from_local(root: &str, scope: &str) -> Repos;
-    async fn from_forge(root: &str, projects: Vec<Project>) -> Repos;
-    async fn aggregate(mut local: Repos, mut remote: Repos) -> Repos;
+    fn from_local(root: &str, scope: &str) -> Repos;
+    fn from_forge(root: &str, projects: Vec<Project>) -> Repos;
+    fn aggregate(local: Repos, remote: Repos) -> Repos;
 }
 
 #[async_trait::async_trait]
 impl Aggregator for Repos {
     #[tracing::instrument(level = "trace")]
-    async fn from_local(root: &str, scope: &str) -> Repos {
-        let mut repos = Vec::new();
+    fn from_local(root: &str, scope: &str) -> Repos {
+        let mut repos = HashMap::new();
 
         let path: std::path::PathBuf = [root, scope].iter().collect();
 
@@ -48,18 +53,25 @@ impl Aggregator for Repos {
                     walker.skip_current_dir();
 
                     match Repository::open(entry.path()) {
-                        Ok(repo) => repos.push(Repo {
-                            name: entry
+                        Ok(repo) => {
+                            let name = entry
                                 .path()
                                 .strip_prefix(root)
                                 .unwrap()
                                 .to_str()
                                 .unwrap()
-                                .to_string(),
-                            path: entry.path().to_path_buf(),
-                            repo: Some(repo),
-                            ..Repo::default()
-                        }),
+                                .to_string();
+
+                            repos.insert(
+                                name.clone(),
+                                RwLock::new(Repo {
+                                    name,
+                                    path: entry.path().to_path_buf(),
+                                    repo: Some(repo),
+                                    ..Repo::default()
+                                }),
+                            );
+                        }
                         Err(err) => error!("could not open repository: {}", err),
                     }
                 } else {
@@ -72,33 +84,37 @@ impl Aggregator for Repos {
     }
 
     #[tracing::instrument(level = "trace")]
-    async fn from_forge(root: &str, projects: Vec<Project>) -> Repos {
+    fn from_forge(root: &str, projects: Vec<Project>) -> Repos {
         projects
             .iter()
             .map(|project| {
                 let mut repo: Repo = project.into();
                 repo.path = [root, &repo.name].iter().collect();
-                repo
+                (repo.name.clone(), RwLock::new(repo))
             })
             .collect()
     }
 
+    // TODO optimise this func
+    //
+    // the iteration is currently quite inefficient as
+    // it's constantly removing stuff from `remote`
     #[tracing::instrument(level = "trace", skip(local, remote))]
-    async fn aggregate(mut local: Repos, mut remote: Repos) -> Repos {
+    fn aggregate(mut local: Repos, mut remote: Repos) -> Repos {
         local = local
             .into_iter()
-            .map(|mut left| {
-                if let Some(i) = remote.iter().position(|right| *right == left) {
-                    let right = remote.remove(i);
-                    left.forge = right.forge;
+            .map(|(left_name, left)| {
+                if let Some(right) = remote.remove(&left_name)
+                {
+                    left.write().unwrap().forge = right.into_inner().unwrap().forge;
                 }
 
-                left
+                (left_name, left)
             })
             .collect();
 
-        local.append(&mut remote);
-        local.sort();
+        local.extend(remote.into_iter());
+        // local.sort();
 
         return local;
     }
