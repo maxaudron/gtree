@@ -4,7 +4,7 @@ use crate::repo::{Repo, RepoError, Repos};
 
 impl crate::GTree {
     pub fn sync(&self, repos: Repos) {
-        for (name, repo) in repos {
+        for (_name, repo) in repos {
             let mut repo = repo.write().unwrap();
 
             match repo.sync() {

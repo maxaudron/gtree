@@ -7,7 +7,7 @@ use crate::repo::{Repo, RepoError, Repos};
 
 impl crate::GTree {
     pub fn update(&self, repos: Repos) {
-        for (name, repo) in repos {
+        for (_name, repo) in repos {
             let mut repo = repo.write().unwrap();
 
             if repo.repo.is_some() {
