@@ -22,6 +22,7 @@ mod update;
 mod tests;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct GTree {
     figment: figment::Figment,
     config: config::Config,
@@ -44,7 +45,6 @@ impl GTree {
             .context("No Forge configured, please setup a forge")?;
 
         let rt = Runtime::new()?;
-
 
         let forge = rt.block_on(forge::Forge::new(forge_config))?;
 
@@ -71,7 +71,7 @@ impl GTree {
         let scope_t = scope.clone();
         let forge_t = forge.clone();
         let handle = thread::spawn(move || {
-            Repos::from_local(&forge_t.root(), &scope_t)
+            Repos::from_local(forge_t.root(), &scope_t)
         });
 
         let projects = self.rt.block_on(self.forge.projects(&scope))?;

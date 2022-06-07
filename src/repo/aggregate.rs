@@ -80,7 +80,7 @@ impl Aggregator for Repos {
             }
         }
 
-        return repos;
+        repos
     }
 
     #[tracing::instrument(level = "trace")]
@@ -116,6 +116,6 @@ impl Aggregator for Repos {
         local.extend(remote.into_iter());
         // local.sort();
 
-        return local;
+        local
     }
 }
