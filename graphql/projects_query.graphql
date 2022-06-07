@@ -1,0 +1,11 @@
+query Projects($scope: String!) {
+  projects(membership: true, searchNamespaces: true, search: $scope) {
+    nodes {
+      id
+      name
+      fullPath
+      sshUrlToRepo
+      httpUrlToRepo
+    }
+  }
+}

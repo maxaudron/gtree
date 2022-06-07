@@ -1,0 +1,38 @@
+[package]
+name = "gtree"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full", "rt-multi-thread"] }
+futures = "0.3"
+
+gitlab = "0.1403"
+graphql_client = "0.8"
+
+git2 = { version = "0.13", features = ["vendored-libgit2", "vendored-openssl"] }
+
+walkdir = "2"
+
+async-trait = "*"
+
+# Arg parsing and config
+structopt = "0.3"
+figment = { version = "0.10", features = ["toml", "yaml", "env"] }
+serde = "1"
+
+# logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# error handling
+anyhow = "1"
+thiserror = "1"
+
+derivative = "2"
+
+url = { version = "2", features = ["serde"] }
+xdg = "2"
+
+# terminal coloring
+ansi_term = "0.12"
