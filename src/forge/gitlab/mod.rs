@@ -35,7 +35,7 @@ impl super::ForgeTrait for Gitlab {
         let query = Projects::build_query(projects::Variables {
             scope: scope.to_owned(),
         });
-        debug!("query: {:#?}", query);
+        // debug!("query: {:#?}", query);
         let res = self.client.graphql::<Projects>(&query).await?;
 
         let res = res
@@ -56,7 +56,8 @@ impl super::ForgeTrait for Gitlab {
 #[graphql(
     query_path = "graphql/projects_query.graphql",
     schema_path = "graphql/schema.graphql",
-    response_derives = "Clone, Debug"
+    response_derives = "Clone,Debug",
+    variables_derives = "Clone,Debug",
 )]
 pub struct Projects;
 
