@@ -1,18 +1,21 @@
-use structopt::StructOpt;
+use clap::{Parser, Subcommand, ArgEnum};
 
-#[derive(StructOpt, Clone, Debug)]
+#[derive(Parser, Clone, Debug)]
+#[clap(
+    override_usage("gtree <SUBCOMMAND> [SCOPE]")
+)]
 /// Sync Gitlab Trees
 pub struct Args {
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub command: Commands,
 
     /// Only operate on this subtree
+    #[clap(global = true)]
     pub scope: Option<String>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
-#[derive(StructOpt)]
-#[structopt(about = "the stupid content tracker")]
+#[derive(Subcommand)]
 pub enum Commands {
     /// Download new repositories and delete old ones, also update
     Sync,
