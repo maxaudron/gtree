@@ -1,8 +1,7 @@
-use anyhow::{bail, Context, Result};
+use anyhow::Result;
 use gitlab::AsyncGitlab;
 
 use graphql_client::GraphQLQuery;
-use tracing::{debug, trace};
 
 pub mod config;
 
@@ -58,18 +57,18 @@ impl super::ForgeTrait for Gitlab {
     query_path = "graphql/projects_query.graphql",
     schema_path = "graphql/schema.graphql",
     response_derives = "Clone,Debug",
-    variables_derives = "Clone,Debug",
+    variables_derives = "Clone,Debug"
 )]
 pub struct Projects;
 
-impl Into<super::Project> for projects::ProjectsProjectsNodes {
-    fn into(self) -> super::Project {
+impl From<projects::ProjectsProjectsNodes> for super::Project {
+    fn from(project: projects::ProjectsProjectsNodes) -> Self {
         super::Project {
-            id: self.id,
-            name: self.name,
-            path: self.full_path,
-            ssh_clone_url: self.ssh_url_to_repo,
-            http_clone_url: self.http_url_to_repo,
+            id: project.id,
+            name: project.name,
+            path: project.full_path,
+            ssh_clone_url: project.ssh_url_to_repo,
+            http_clone_url: project.http_url_to_repo,
         }
     }
 }

@@ -2,7 +2,7 @@ pub mod args;
 
 use serde::{Deserialize, Serialize};
 
-use std::{collections::BTreeMap, ops::Deref, path::Path};
+use std::{collections::BTreeMap, ops::Deref};
 
 use figment::{
     providers::{Format, Toml},
@@ -19,7 +19,7 @@ use anyhow::{Context, Result};
 // TODO make forge optional
 pub struct Config {
     #[serde(flatten)]
-    config: BTreeMap<String, ForgeConfig>
+    config: BTreeMap<String, ForgeConfig>,
 }
 
 impl Deref for Config {
@@ -32,7 +32,7 @@ impl Deref for Config {
 
 impl Config {
     // Allow the configuration to be extracted from any `Provider`.
-    fn from<T: Provider>(provider: T) -> Result<Config, Error> {
+    pub fn from<T: Provider>(provider: T) -> Result<Config, Error> {
         Figment::from(provider).extract()
     }
 

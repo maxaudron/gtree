@@ -2,7 +2,7 @@ use std::{fmt::Debug, path::PathBuf};
 
 use thiserror::Error;
 
-use git2::{AnnotatedCommit, Remote, Repository};
+use git2::{Branch, Remote, Repository};
 use tracing::{debug, trace};
 
 use crate::forge::Project;
@@ -17,34 +17,13 @@ pub type Repos = Vec<Repo>;
 
 pub struct Repo {
     pub name: String,
+    pub path: PathBuf,
     pub repo: Option<Repository>,
     pub forge: Option<Project>,
+    pub default_branch: String,
 }
 
 impl Repo {
-    /// Fetch any new state from the remote,
-    /// we get the default branch in the same run.
-    ///
-    /// Then check if the repo is to be considered clean,
-    /// no stale uncommitted changes, no in progress merges etc
-    #[tracing::instrument(level = "trace")]
-    pub fn update(&self) -> Result<(), RepoError> {
-        let mut remote = self.main_remote()?;
-
-        let fetch_head = self.fetch(&mut remote)?;
-
-        let default_branch = remote.default_branch()?.as_str().unwrap().to_string();
-        debug!("default branch: {}", default_branch);
-
-        if self.is_clean()? {
-            debug!("repo is clean");
-
-            self.merge(&default_branch, &fetch_head)?;
-        };
-
-        Ok(())
-    }
-
     pub fn is_clean(&self) -> Result<bool, RepoError> {
         if let Some(repo) = &self.repo {
             debug!("repo state: {:?}", repo.state());
@@ -72,28 +51,22 @@ impl Repo {
         }
     }
 
-    pub fn main_remote(&self) -> Result<git2::Remote, RepoError> {
-        if let Some(repo) = &self.repo {
-            let remotes = repo.remotes()?;
+    pub fn main_remote<'a>(&self, repo: &'a Repository) -> Result<git2::Remote<'a>, RepoError> {
+        let remotes = repo.remotes()?;
 
-            let remote = if let Some(_) = remotes.iter().find(|x| *x == Some("origin")) {
-                "origin"
-            } else {
-                if let Some(remote) = remotes.get(0) {
-                    remote
-                } else {
-                    return Err(RepoError::NoRemoteFound);
-                }
-            };
-
-            return Ok(repo.find_remote(remote)?);
+        let remote = if remotes.iter().any(|x| x == Some("origin")) {
+            "origin"
+        } else if let Some(remote) = remotes.get(0) {
+            remote
         } else {
-            return Err(RepoError::NoLocalRepo);
-        }
+            return Err(RepoError::NoRemoteFound);
+        };
+
+        return Ok(repo.find_remote(remote)?);
     }
 
     #[tracing::instrument(level = "trace", skip(remote))]
-    pub fn fetch(&self, remote: &mut Remote) -> Result<AnnotatedCommit, RepoError> {
+    pub fn fetch<'a>(&self, remote: &mut Remote) -> Result<(), RepoError> {
         // Pass an empty array as the refspec to fetch to fetch the "default" refspecs
         // Type annotation is needed because type can't be guessed from the empty array
         remote.fetch::<&str>(
@@ -102,14 +75,20 @@ impl Repo {
             Some("gtree fetch"),
         )?;
 
-        let repo = self.repo.as_ref().unwrap();
-
-        let fetch_head = repo.find_reference("FETCH_HEAD")?;
-
-        Ok(repo.reference_to_annotated_commit(&fetch_head)?)
-        // Ok(remote.default_branch()?.as_str().unwrap().to_string())
+        Ok(())
     }
 
+    #[tracing::instrument(level = "trace")]
+    pub fn clone(&self, url: &str) -> Result<Repository, RepoError> {
+        let mut builder = git2::build::RepoBuilder::new();
+        builder.fetch_options(crate::git::fetch_options());
+
+        builder
+            .clone(url, &self.path)
+            .map_err(RepoError::GitError)
+    }
+
+    #[tracing::instrument(level = "trace")]
     pub fn checkout(&self) -> Result<(), RepoError> {
         if let Some(repo) = &self.repo {
             repo.checkout_head(None).map_err(|e| e.into())
@@ -118,31 +97,54 @@ impl Repo {
         }
     }
 
-    pub fn merge(&self, refname: &str, fetch_commit: &AnnotatedCommit) -> Result<(), RepoError> {
-        let repo = self.repo.as_ref().unwrap();
+    pub fn branch_name(branch: &Branch) -> String {
+        match branch.name().unwrap() {
+            Some(s) => s.to_string(),
+            None => String::from_utf8_lossy(branch.name_bytes().unwrap()).to_string(),
+        }
+    }
 
-        let analysis = repo.merge_analysis(&[fetch_commit])?;
+    #[tracing::instrument(level = "trace", skip(repo, local, upstream))]
+    pub fn merge(
+        &self,
+        repo: &Repository,
+        local: &mut Branch,
+        upstream: &Branch,
+    ) -> Result<bool, RepoError> {
+        let local_name = Repo::branch_name(local);
+        let upstream_name = Repo::branch_name(upstream);
+
+        let local_ref = local.get_mut();
+        let upstream_ref = upstream.get();
+
+        let analysis = repo.merge_analysis_for_ref(
+            local_ref,
+            &[&repo.reference_to_annotated_commit(upstream_ref)?],
+        )?;
 
         if analysis.0.is_fast_forward() {
             trace!("Doing a fast forward");
-            match repo.find_reference(&refname) {
-                Ok(mut r) => {
-                    let name = match r.name() {
-                        Some(s) => s.to_string(),
-                        None => String::from_utf8_lossy(r.name_bytes()).to_string(),
-                    };
-                    let msg = format!("gtree: update repo branch: {} to {}", name, fetch_commit.id());
-                    debug!("{}", msg);
 
-                    r.set_target(fetch_commit.id(), &msg)?;
-                    repo.set_head(&name)?;
-                    repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
-                }
-                Err(_) => (),
-            };
+            let msg = format!(
+                "gtree: update repo branch: {} to {}",
+                local_name, upstream_name
+            );
+            debug!("{}", msg);
+
+            // sets the branch to target the new commit
+            // of the remote branch it's tracking
+            local_ref.set_target(upstream_ref.target().unwrap(), &msg)?;
+            // Apply these changes in the working dir if the branch is currently checked out.
+            if format!("refs/heads/{}", local_name) == self.default_branch {
+                repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?
+            }
+
+            Ok(true)
+        } else if analysis.0.is_up_to_date() {
+            Ok(false)
+        } else {
+            Err(RepoError::NoFF)
         }
-
-        Ok(())
     }
 }
 
@@ -152,6 +154,10 @@ pub enum RepoError {
     NoLocalRepo,
     #[error("local git repo does not have a remote")]
     NoRemoteFound,
+    #[error("repository is dirty")]
+    Dirty,
+    #[error("fast-forward merge was not possible")]
+    NoFF,
     #[error("error during git operation {0}")]
     GitError(#[from] git2::Error),
     #[error("unknown repo error")]
@@ -182,8 +188,8 @@ impl From<Project> for Repo {
     fn from(project: Project) -> Self {
         Self {
             name: project.path.clone(),
-            repo: None,
             forge: Some(project),
+            ..Repo::default()
         }
     }
 }
@@ -192,8 +198,8 @@ impl From<&Project> for Repo {
     fn from(project: &Project) -> Self {
         Self {
             name: project.path.clone(),
-            repo: None,
             forge: Some(project.to_owned()),
+            ..Repo::default()
         }
     }
 }
@@ -207,5 +213,17 @@ impl std::fmt::Display for Repo {
 impl Debug for Repo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Repo").field("path", &self.name).finish()
+    }
+}
+
+impl Default for Repo {
+    fn default() -> Self {
+        Self {
+            name: Default::default(),
+            path: Default::default(),
+            repo: Default::default(),
+            forge: Default::default(),
+            default_branch: "main".to_string(),
+        }
     }
 }

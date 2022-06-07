@@ -1,8 +1,6 @@
-use std::path::PathBuf;
-
 use git2::Repository;
 
-use tracing::{debug, error};
+use tracing::error;
 use walkdir::WalkDir;
 
 use crate::forge::Project;
@@ -40,7 +38,7 @@ impl Aggregator for Repos {
             if entry.file_type().is_dir() {
                 let mut dir = std::fs::read_dir(entry.path()).unwrap();
 
-                if let Some(_) = dir.find(|dir| {
+                if dir.any(|dir| {
                     if let Ok(dir) = dir {
                         dir.file_name() == ".git"
                     } else {
@@ -80,7 +78,7 @@ impl Aggregator for Repos {
             .map(|project| {
                 let mut repo: Repo = project.into();
                 repo.path = [root, &repo.name].iter().collect();
-                return repo;
+                repo
             })
             .collect()
     }
