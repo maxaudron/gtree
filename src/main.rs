@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use structopt::StructOpt;
+use clap::Parser;
 use derivative::Derivative;
 
 use tracing::{debug, info, metadata::LevelFilter, trace, Level};
@@ -26,7 +26,7 @@ struct GTree {
 
 impl GTree {
     pub async fn new() -> Result<GTree> {
-        let args = config::args::Args::from_args();
+        let args = config::args::Args::parse();
 
         let figment = config::Config::figment()?;
         let config: config::Config = figment.extract()?;
