@@ -11,7 +11,7 @@ itertools = "0.10"
 num_cpus = "1"
 once_cell = "1"
 
-gitlab = "0.1408"
+gitlab = "0.1500"
 graphql_client = "0.10"
 
 git2 = { version = "0.14" }
