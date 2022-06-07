@@ -18,17 +18,23 @@ mod list;
 mod sync;
 mod update;
 
+mod batch;
+
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug)]
+use once_cell::sync::OnceCell;
+
+static GTREE: OnceCell<GTree> = OnceCell::new();
+static RUNTIME: OnceCell<Runtime> = OnceCell::new();
+
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 struct GTree {
     figment: figment::Figment,
     config: config::Config,
     args: config::args::Args,
     forge: forge::Forge,
-    rt: Runtime,
 }
 
 impl GTree {
@@ -44,16 +50,15 @@ impl GTree {
             .next()
             .context("No Forge configured, please setup a forge")?;
 
-        let rt = Runtime::new()?;
+        RUNTIME.set(Runtime::new()?).unwrap();
 
-        let forge = rt.block_on(forge::Forge::new(forge_config))?;
+        let forge = RUNTIME.get().unwrap().block_on(forge::Forge::new(forge_config))?;
 
         Ok(GTree {
             figment,
             config,
             args,
             forge,
-            rt
         })
     }
 
@@ -74,7 +79,7 @@ impl GTree {
             Repos::from_local(forge_t.root(), &scope_t)
         });
 
-        let projects = self.rt.block_on(self.forge.projects(&scope))?;
+        let projects = RUNTIME.get().unwrap().block_on(self.forge.projects(&scope))?;
         let remote = Repos::from_forge(forge.root(), projects);
 
         let local = handle.join().unwrap();
@@ -108,6 +113,7 @@ fn main() -> Result<()> {
     debug!("starting");
 
     let gtree = GTree::new()?;
+    GTREE.set(gtree.clone()).unwrap();
 
     gtree.run()?;
 

@@ -574,6 +574,8 @@ dependencies = [
  "gitlab",
  "graphql_client",
  "itertools",
+ "num_cpus",
+ "once_cell",
  "serde",
  "thiserror",
  "tokio",
