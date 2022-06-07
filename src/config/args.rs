@@ -1,9 +1,7 @@
-use clap::{Parser, Subcommand, ArgEnum};
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Clone, Debug)]
-#[clap(
-    override_usage("gtree <SUBCOMMAND> [SCOPE]")
-)]
+#[clap(override_usage("gtree <SUBCOMMAND> [SCOPE]"))]
 /// Sync Gitlab Trees
 pub struct Args {
     #[clap(subcommand)]
@@ -14,8 +12,7 @@ pub struct Args {
     pub scope: Option<String>,
 }
 
-#[derive(PartialEq, Clone, Debug)]
-#[derive(Subcommand)]
+#[derive(PartialEq, Clone, Debug, Subcommand)]
 pub enum Commands {
     /// Download new repositories and delete old ones, also update
     Sync,

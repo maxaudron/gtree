@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::config::ForgeConfig;
@@ -18,6 +18,7 @@ impl Forge {
             ForgeConfig::Gitlab(config) => {
                 Ok(Forge::Gitlab(gitlab::Gitlab::from_config(config).await?))
             }
+            #[allow(unreachable_patterns)]
             _ => bail!("wrong forge type found"),
         }
     }

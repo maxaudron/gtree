@@ -2,17 +2,22 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use derivative::Derivative;
 
-use tracing::{debug, info, metadata::LevelFilter, trace, Level};
+use tracing::{debug, metadata::LevelFilter, Level};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
 
-use gtree::{
-    config,
-    local::{Aggregator, Repos},
-};
+use crate::repo::{Aggregator, Repos};
+
+pub mod config;
+pub mod forge;
+pub mod git;
+pub mod repo;
 
 mod list;
 mod sync;
 mod update;
+
+#[cfg(test)]
+mod tests;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -20,9 +25,7 @@ struct GTree {
     figment: figment::Figment,
     config: config::Config,
     args: config::args::Args,
-    forge: gtree::forge::Forge,
-    #[derivative(Debug = "ignore")]
-    gitconfig: git2::Config,
+    forge: forge::Forge,
 }
 
 impl GTree {
@@ -38,16 +41,13 @@ impl GTree {
             .next()
             .context("No Forge configured, please setup a forge")?;
 
-        let forge = gtree::forge::Forge::new(forge_config).await?;
-
-        let gitconfig = git2::Config::open_default()?;
+        let forge = forge::Forge::new(forge_config).await?;
 
         Ok(GTree {
             figment,
             config,
             args,
             forge,
-            gitconfig,
         })
     }
 

@@ -1,9 +1,13 @@
-use gtree::local::*;
+use crate::repo::*;
 
 use anyhow::Result;
 use git2::Repository;
 
-const TEST_DIR: &str = env!("CARGO_TARGET_TMPDIR");
+thread_local! {
+    static TEST_DIR: std::path::PathBuf = std::env::current_exe()
+        .unwrap()
+        .join(std::path::Path::new("../../tmp"));
+}
 
 const REPOS: [&str; 5] = [
     "repos/site/group/repo1",
@@ -15,7 +19,7 @@ const REPOS: [&str; 5] = [
 
 fn prepare_repos() -> Result<()> {
     REPOS.iter().try_for_each(|repo| {
-        let path = format!("{}/{}", TEST_DIR, repo);
+        let path = format!("{:?}/{}", TEST_DIR, repo);
         std::fs::create_dir_all(&path)?;
         let _repo = Repository::init(&path)?;
 
@@ -25,7 +29,7 @@ fn prepare_repos() -> Result<()> {
 
 fn clean_repos() -> Result<()> {
     REPOS.iter().try_for_each(|repo| {
-        let path = format!("{}/{}", TEST_DIR, repo);
+        let path = format!("{:?}/{}", TEST_DIR, repo);
         std::fs::remove_dir_all(&path)?;
 
         Ok::<(), anyhow::Error>(())
@@ -39,16 +43,16 @@ async fn search_repos() -> Result<()> {
     prepare_repos()?;
 
     let mut left: Vec<String> = vec![
-        format!("{}/repos/site/group/repo1", TEST_DIR),
-        format!("{}/repos/site/group/repo2", TEST_DIR),
-        format!("{}/repos/site/group/subgroup/repo3", TEST_DIR),
-        format!("{}/repos/site/group/subgroup/subsubgroup/repo4", TEST_DIR),
+        format!("{:?}/repos/site/group/repo1", TEST_DIR),
+        format!("{:?}/repos/site/group/repo2", TEST_DIR),
+        format!("{:?}/repos/site/group/subgroup/repo3", TEST_DIR),
+        format!("{:?}/repos/site/group/subgroup/subsubgroup/repo4", TEST_DIR),
     ];
-    let right = Repos::from_local(&format!("{}/repos", TEST_DIR), "").await;
+    let right = Repos::from_local(&format!("{:?}/repos", TEST_DIR), "").await;
 
     let mut right: Vec<&str> = right.iter().map(|x| x.name.as_str()).collect();
 
-    assert_eq!(left.sort(), right.sort());
+    assert_eq!(left.sort(), right.sort_unstable());
 
     clean_repos()?;
     Ok(())
