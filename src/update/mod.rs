@@ -3,20 +3,21 @@ use std::fmt::{Debug, Display};
 use git2::BranchType;
 use tracing::debug;
 
-use crate::repo::{Repo, RepoError, Repos};
+use crate::{
+    batch::batch,
+    repo::{Repo, RepoError, Repos},
+};
 
 impl crate::GTree {
     pub fn update(&self, repos: Repos) {
-        for (_name, repo) in repos {
-            let mut repo = repo.write().unwrap();
-
+        batch(repos, |mut repo| {
             if repo.repo.is_some() {
                 match repo.update() {
                     Ok(u) => println!("{}", u),
                     Err(u) => println!("{}", u),
                 };
             }
-        }
+        });
     }
 }
 
