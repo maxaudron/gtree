@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use git2::Repository;
 
 use tracing::{debug, error};
@@ -10,18 +12,19 @@ use super::{Repo, Repos};
 #[async_trait::async_trait]
 pub trait Aggregator {
     async fn from_local(root: &str, scope: &str) -> Repos;
-    async fn from_forge(projects: Vec<Project>) -> Repos;
+    async fn from_forge(root: &str, projects: Vec<Project>) -> Repos;
     async fn aggregate(mut local: Repos, mut remote: Repos) -> Repos;
 }
 
 #[async_trait::async_trait]
 impl Aggregator for Repos {
+    #[tracing::instrument(level = "trace")]
     async fn from_local(root: &str, scope: &str) -> Repos {
         let mut repos = Vec::new();
 
         let path: std::path::PathBuf = [root, scope].iter().collect();
 
-        if ! path.exists() {
+        if !path.exists() {
             return repos;
         }
 
@@ -55,7 +58,7 @@ impl Aggregator for Repos {
                                 .to_str()
                                 .unwrap()
                                 .to_string(),
-                            // path: entry.path().to_path_buf(),
+                            path: entry.path().to_path_buf(),
                             repo: Some(repo),
                             ..Repo::default()
                         }),
@@ -70,11 +73,19 @@ impl Aggregator for Repos {
         return repos;
     }
 
-    async fn from_forge(projects: Vec<Project>) -> Repos {
-        projects.iter().map(|project| project.into()).collect()
+    #[tracing::instrument(level = "trace")]
+    async fn from_forge(root: &str, projects: Vec<Project>) -> Repos {
+        projects
+            .iter()
+            .map(|project| {
+                let mut repo: Repo = project.into();
+                repo.path = [root, &repo.name].iter().collect();
+                return repo;
+            })
+            .collect()
     }
 
-    #[tracing::instrument(level = "debug", skip(local, remote))]
+    #[tracing::instrument(level = "trace", skip(local, remote))]
     async fn aggregate(mut local: Repos, mut remote: Repos) -> Repos {
         local = local
             .into_iter()

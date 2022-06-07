@@ -31,6 +31,7 @@ impl Gitlab {
 
 #[async_trait::async_trait]
 impl super::ForgeTrait for Gitlab {
+    #[tracing::instrument(level = "trace")]
     async fn projects(&self, scope: &str) -> Result<Vec<super::Project>> {
         let query = Projects::build_query(projects::Variables {
             scope: scope.to_owned(),
