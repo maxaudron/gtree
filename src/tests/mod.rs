@@ -48,9 +48,9 @@ async fn search_repos() -> Result<()> {
         format!("{:?}/repos/site/group/subgroup/repo3", TEST_DIR),
         format!("{:?}/repos/site/group/subgroup/subsubgroup/repo4", TEST_DIR),
     ];
-    let right = Repos::from_local(&format!("{:?}/repos", TEST_DIR), "").await;
+    let right = Repos::from_local(&format!("{:?}/repos", TEST_DIR), "");
 
-    let mut right: Vec<&str> = right.iter().map(|x| x.name.as_str()).collect();
+    let mut right: Vec<&str> = right.iter().map(|x| x.0.as_str()).collect();
 
     assert_eq!(left.sort(), right.sort_unstable());
 

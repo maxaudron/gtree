@@ -573,6 +573,7 @@ dependencies = [
  "git2",
  "gitlab",
  "graphql_client",
+ "itertools",
  "serde",
  "thiserror",
  "tokio",

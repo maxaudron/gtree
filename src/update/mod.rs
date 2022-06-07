@@ -6,8 +6,10 @@ use tracing::debug;
 use crate::repo::{Repo, RepoError, Repos};
 
 impl crate::GTree {
-    pub async fn update(&self, repos: Repos) {
-        for mut repo in repos {
+    pub fn update(&self, repos: Repos) {
+        for (name, repo) in repos {
+            let mut repo = repo.write().unwrap();
+
             if repo.repo.is_some() {
                 match repo.update() {
                     Ok(u) => println!("{}", u),

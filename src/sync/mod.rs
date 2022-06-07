@@ -3,8 +3,10 @@ use std::fmt::{Debug, Display};
 use crate::repo::{Repo, RepoError, Repos};
 
 impl crate::GTree {
-    pub async fn sync(&self, repos: Repos) {
-        for mut repo in repos {
+    pub fn sync(&self, repos: Repos) {
+        for (name, repo) in repos {
+            let mut repo = repo.write().unwrap();
+
             match repo.sync() {
                 Ok(u) => println!("{}", u),
                 Err(u) => println!("{}", u),
@@ -30,7 +32,7 @@ impl Repo {
         if self.repo.is_some() && self.forge.is_some() {
             Ok(SyncResult::no_changes(repo_name))
         } else if self.repo.is_some() {
-            // do push stuff
+            // TODO do push stuff
             Ok(SyncResult::pushed(repo_name))
         } else if self.forge.is_some() {
             let url = self
@@ -44,6 +46,9 @@ impl Repo {
             let repo = self
                 .clone(url)
                 .map_err(|err| SyncResult::err(repo_name.clone(), err))?;
+
+            // TODO detect moved repos based on first commit
+            // ???? how to detect and not move forks?
 
             self.repo = Some(repo);
             Ok(SyncResult::cloned(repo_name))

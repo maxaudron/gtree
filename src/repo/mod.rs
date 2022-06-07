@@ -1,4 +1,9 @@
-use std::{fmt::Debug, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    path::PathBuf,
+    sync::RwLock,
+};
 
 use thiserror::Error;
 
@@ -13,7 +18,8 @@ mod repostate;
 pub use aggregate::*;
 pub use repostate::*;
 
-pub type Repos = Vec<Repo>;
+// pub type Repos = Vec<Repo>;
+pub type Repos = HashMap<String, RwLock<Repo>>;
 
 pub struct Repo {
     pub name: String,
@@ -83,9 +89,7 @@ impl Repo {
         let mut builder = git2::build::RepoBuilder::new();
         builder.fetch_options(crate::git::fetch_options());
 
-        builder
-            .clone(url, &self.path)
-            .map_err(RepoError::GitError)
+        builder.clone(url, &self.path).map_err(RepoError::GitError)
     }
 
     #[tracing::instrument(level = "trace")]
