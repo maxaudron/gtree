@@ -1,7 +1,12 @@
 [package]
 name = "gtree"
-version = "0.1.0"
+description = "A tool to clone and pull whole group trees from a git forge, properly organized on disk."
+version = "1.0.0"
 edition = "2021"
+authors = ["Max Audron <audron@cocaine.farm>"]
+license = "ISC"
+homepage = "https://gitlab.com/cocainefarm/gtree"
+repository = "https://gitlab.com/cocainefarm/gtree"
 
 [dependencies]
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
@@ -18,7 +23,7 @@ git2 = { version = "0.14" }
 
 walkdir = "2"
 
-async-trait = "*"
+async-trait = "0.1"
 
 # Arg parsing and config
 clap = { version = "3", features = ["derive"] }
