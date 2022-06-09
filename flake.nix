@@ -75,6 +75,10 @@
             cargo = rust;
             rustc = rust;
           };
+
+          gitlab-upload = makeBinScript "gitlab-upload" ''
+            ${pkgs.curl} -f --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" --upload-file result/bin/gtree https://gitlab.com/api/v4/projects/${project_id}/packages/generic/${name}/${version}/$1
+          '';
         in rec {
           # `nix build`
           packages.gtreeStatic = naersk-lib.buildPackage {
