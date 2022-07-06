@@ -35,15 +35,35 @@ impl super::ForgeTrait for Gitlab {
     async fn projects(&self, scope: &str) -> Result<Vec<super::Project>> {
         let query = Projects::build_query(projects::Variables {
             scope: scope.to_owned(),
+            after: "".to_owned(),
         });
-        // debug!("query: {:#?}", query);
+
         let res = self.client.graphql::<Projects>(&query).await?;
 
-        let res = res
-            .projects
-            .unwrap()
-            .nodes
-            .unwrap()
+        let projects = res.projects.unwrap();
+
+        let mut page = projects.page_info.end_cursor.unwrap();
+        let mut has_next_page = projects.page_info.has_next_page;
+
+        let mut nodes = projects.nodes.unwrap().clone();
+
+        while has_next_page {
+            let query = Projects::build_query(projects::Variables {
+                scope: scope.to_owned(),
+                after: page,
+            });
+
+            let res = self.client.graphql::<Projects>(&query).await?;
+
+            let projects = res.projects.unwrap();
+
+            page = projects.page_info.end_cursor.unwrap();
+            has_next_page = projects.page_info.has_next_page;
+
+            nodes.append(&mut projects.nodes.unwrap());
+        }
+
+        let res = nodes
             .into_iter()
             .filter(|x| x.is_some())
             .map(|x| x.unwrap().into())
