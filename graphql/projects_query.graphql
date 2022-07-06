@@ -1,11 +1,16 @@
-query Projects($scope: String!) {
-  projects(membership: true, searchNamespaces: true, search: $scope) {
+query Projects($scope: String!, $after: String!) {
+  projects(membership: true, searchNamespaces: true, search: $scope, after: $after) {
     nodes {
       id
       name
       fullPath
       sshUrlToRepo
       httpUrlToRepo
+    }
+
+    pageInfo {
+      endCursor
+      hasNextPage
     }
   }
 }
