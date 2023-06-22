@@ -16,10 +16,10 @@ itertools = "0.10"
 num_cpus = "1"
 once_cell = "1"
 
-gitlab = "0.1501"
-graphql_client = "0.10"
+gitlab = "0.1600"
+graphql_client = "0.11"
 
-git2 = { version = "0.14" }
+git2 = { version = "0.17" }
 
 walkdir = "2"
 
