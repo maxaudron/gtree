@@ -45,3 +45,17 @@ token = "HgDAfJ9tfD5xUw2L6SUm"
 # Directory to clone the repos into
 directory = "/home/audron/repo/gitlab.com"
 #+end_src
+
+* Known Problems
+** error during git operation invalid or unknown remote ssh hostkey
+libgit2, the git library this project uses, does not have support for ssh
+configuration via ~\~/.ssh/config~. Thus if you have a custom location for the
+~known_hosts~ file or disabled known hosts verification this configuration will
+not be respected.
+
+Execute a ssh-keyscan to a known hosts file for each of your configured forges:
+#+begin_src sh
+ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+#+end_src
+
+https://github.com/libgit2/libgit2/issues/4872
