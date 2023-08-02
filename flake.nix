@@ -40,21 +40,28 @@
           else
             [ ]));
 
+        openssl =
+          (if (system == "aarch64-darwin" || system == "x86_64-darwin") then
+            pkgs.openssl.override { static = true; }
+          else
+            pkgs.pkgsStatic.openssl);
+
         nativeBuildInputs = with pkgs;
           [
             rustToolchain
             pkg-config
 
-            pkgsStatic.openssl
+            openssl
           ] ++ lib.optional stdenv.isDarwin [
-            pkgs.libiconv
+            pkgs.darwin.libiconv
             pkgs.darwin.apple_sdk.frameworks.Security
           ];
 
-        OPENSSL_DIR = "${pkgs.pkgsStatic.openssl}";
-        OPENSSL_LIB_DIR = "${pkgs.pkgsStatic.openssl.out}/lib";
-        OPENSSL_CRYPTO_LIBRARY = "${pkgs.pkgsStatic.openssl.out}/lib";
-        OPENSSL_INCLUDE_DIR = "${pkgs.pkgsStatic.openssl.dev}/include";
+        OPENSSL_STATIC = "true";
+        OPENSSL_DIR = "${openssl}";
+        OPENSSL_LIB_DIR = "${openssl.out}/lib";
+        OPENSSL_CRYPTO_LIBRARY = "${openssl.out}/lib";
+        OPENSSL_INCLUDE_DIR = "${openssl.dev}/include";
         CARGO_BUILD_TARGET = if system == "x86_64-linux" then
           "x86_64-unknown-linux-musl"
         else
@@ -82,7 +89,7 @@
         packages = {
           cargoArtifacts = craneLib.buildDepsOnly {
             inherit src;
-            inherit nativeBuildInputs OPENSSL_DIR OPENSSL_LIB_DIR
+            inherit nativeBuildInputs OPENSSL_STATIC OPENSSL_DIR OPENSSL_LIB_DIR
               OPENSSL_CRYPTO_LIBRARY OPENSSL_INCLUDE_DIR CARGO_BUILD_TARGET
               CARGO_BUILD_RUSTFLAGS;
           };
@@ -91,7 +98,7 @@
           # Build Binaries
           gtree = craneLib.buildPackage {
             inherit cargoArtifacts src;
-            inherit nativeBuildInputs OPENSSL_DIR OPENSSL_LIB_DIR
+            inherit nativeBuildInputs OPENSSL_STATIC OPENSSL_DIR OPENSSL_LIB_DIR
               OPENSSL_CRYPTO_LIBRARY OPENSSL_INCLUDE_DIR CARGO_BUILD_TARGET
               CARGO_BUILD_RUSTFLAGS;
           };
@@ -100,7 +107,7 @@
         };
 
         devShells.default = pkgs.mkShell {
-          inherit nativeBuildInputs OPENSSL_DIR OPENSSL_LIB_DIR
+          inherit nativeBuildInputs OPENSSL_STATIC OPENSSL_DIR OPENSSL_LIB_DIR
             OPENSSL_CRYPTO_LIBRARY OPENSSL_INCLUDE_DIR CARGO_BUILD_TARGET
             CARGO_BUILD_RUSTFLAGS;
         };
