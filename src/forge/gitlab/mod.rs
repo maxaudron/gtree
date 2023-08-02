@@ -41,11 +41,15 @@ impl super::ForgeTrait for Gitlab {
         let res = self.client.graphql::<Projects>(&query).await?;
 
         let projects = res.projects.unwrap();
+        tracing::debug!("projects: {:#?}", projects);
+
+        let mut nodes = projects.nodes.unwrap().clone();
+        if nodes.is_empty() {
+            return Err(anyhow::anyhow!("No projects found with search: {:?}", scope));
+        };
 
         let mut page = projects.page_info.end_cursor.unwrap();
         let mut has_next_page = projects.page_info.has_next_page;
-
-        let mut nodes = projects.nodes.unwrap().clone();
 
         while has_next_page {
             let query = Projects::build_query(projects::Variables {
