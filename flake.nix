@@ -1,116 +1,110 @@
 {
   nixConfig = {
     substituters =
-      [ "https://cache.nixos.org/" "https://nix-community.cachix.org" "https://nix.cache.vapor.systems" ];
+      [ "https://cache.nixos.org/" "https://nix-community.cachix.org" ];
     trusted-public-keys = [
       "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-      "nix.cache.vapor.systems-1:OjV+eZuOK+im1n8tuwHdT+9hkQVoJORdX96FvWcMABk="
     ];
   };
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs";
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
+
+    fenix = {
+      url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    naersk = {
-      url = "github:nmattia/naersk";
+
+    crane = {
+      url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    advisory-db = {
+      url = "github:rustsec/advisory-db";
+      flake = false;
+    };
+
     utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, utils, naersk }:
+  outputs = { self, nixpkgs, utils, fenix, crane, advisory-db }:
     with nixpkgs.lib;
-    recursiveUpdate (utils.lib.eachDefaultSystem (system:
+    utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        rust = rust-overlay.packages."${system}".rust;
+        rustToolchain = with fenix.packages.${system};
+          combine ([ latest.toolchain ] ++ (if system == "x86_64-linux" then
+            [ targets.x86_64-unknown-linux-musl.latest.rust-std ]
+          else
+            [ ]));
 
-        naersk-lib = naersk.lib."${system}".override {
-          cargo = rust;
-          rustc = rust;
-        };
-      in rec {
-        packages.default = packages.gtree;
+        nativeBuildInputs = with pkgs;
+          [
+            rustToolchain
+            pkg-config
 
-        packages.gtree = naersk-lib.buildPackage {
-          pname = "gtree";
-          root = ./.;
-
-          nativeBuildInputs = [ pkgs.perl ];
-
-          cargoBuildOptions = prev:
-            prev ++ [ "--features=vendored-libgit2,vendored-openssl" ];
-        };
-
-        apps.default = utils.lib.mkApp { drv = packages.default; };
-
-        devShell = pkgs.mkShell { nativeBuildInputs = [ rust pkgs.perl ]; };
-      })) (utils.lib.eachSystem [
-        utils.lib.system.x86_64-linux
-        utils.lib.system.aarch64-linux
-      ] (system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-
-          staticInputs = with pkgs; [
-            pkgsStatic.stdenv.cc
-            pkgsStatic.openssl.dev
-            rust
-            perl
+            pkgsStatic.openssl
+          ] ++ lib.optional stdenv.isDarwin [
+            pkgs.libiconv
+            pkgs.darwin.apple_sdk.frameworks.Security
           ];
 
-          target =
-            "${elemAt (strings.splitString "-" system) 0}-unknown-linux-musl";
+        OPENSSL_DIR = "${pkgs.pkgsStatic.openssl}";
+        OPENSSL_LIB_DIR = "${pkgs.pkgsStatic.openssl.out}/lib";
+        OPENSSL_CRYPTO_LIBRARY = "${pkgs.pkgsStatic.openssl.out}/lib";
+        OPENSSL_INCLUDE_DIR = "${pkgs.pkgsStatic.openssl.dev}/include";
+        CARGO_BUILD_TARGET = if system == "x86_64-linux" then
+          "x86_64-unknown-linux-musl"
+        else
+          null;
+        CARGO_BUILD_RUSTFLAGS = if system == "x86_64-linux" then
+          "-C target-feature=+crt-static"
+        else
+          null;
 
-          rust = rust-overlay.packages."${system}".rust.override {
-            extensions = [ "rust-src" ];
-            targets = [ target ];
+        graphqlFilter = path: _type: builtins.match ".*graphql$" path != null;
+        markdownFilter = path: _type: builtins.match ".*md$" path != null;
+        markdownOrCargo = path: type:
+          (graphqlFilter path type) || (markdownFilter path type)
+          || (craneLib.filterCargoSources path type);
+
+        # crane setup
+        craneLib = crane.lib.${system}.overrideToolchain rustToolchain;
+        src = nixpkgs.lib.cleanSourceWith {
+          src = craneLib.path ./.; # The original, unfiltered source
+          filter = markdownOrCargo;
+        };
+
+        cargoArtifacts = self.packages.${system}.cargoArtifacts;
+      in {
+        packages = {
+          cargoArtifacts = craneLib.buildDepsOnly {
+            inherit src;
+            inherit nativeBuildInputs OPENSSL_DIR OPENSSL_LIB_DIR
+              OPENSSL_CRYPTO_LIBRARY OPENSSL_INCLUDE_DIR CARGO_BUILD_TARGET
+              CARGO_BUILD_RUSTFLAGS;
           };
 
-          naersk-lib = naersk.lib."${system}".override {
-            cargo = rust;
-            rustc = rust;
+          #####################################
+          # Build Binaries
+          gtree = craneLib.buildPackage {
+            inherit cargoArtifacts src;
+            inherit nativeBuildInputs OPENSSL_DIR OPENSSL_LIB_DIR
+              OPENSSL_CRYPTO_LIBRARY OPENSSL_INCLUDE_DIR CARGO_BUILD_TARGET
+              CARGO_BUILD_RUSTFLAGS;
           };
 
-          gitlab-upload = makeBinScript "gitlab-upload" ''
-            ${pkgs.curl} -f --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" --upload-file result/bin/gtree https://gitlab.com/api/v4/projects/${project_id}/packages/generic/${name}/${version}/$1
-          '';
-        in rec {
-          # `nix build`
-          packages.gtreeStatic = naersk-lib.buildPackage {
-            pname = "gtree";
-            root = ./.;
+          default = self.packages.${system}.gtree;
+        };
 
-            nativeBuildInputs = staticInputs;
+        devShells.default = pkgs.mkShell {
+          inherit nativeBuildInputs OPENSSL_DIR OPENSSL_LIB_DIR
+            OPENSSL_CRYPTO_LIBRARY OPENSSL_INCLUDE_DIR CARGO_BUILD_TARGET
+            CARGO_BUILD_RUSTFLAGS;
+        };
 
-            CARGO_BUILD_TARGET = target;
-            CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS =
-              "-C target-feature=+crt-static";
-            CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS =
-              "-C target-feature=+crt-static";
-
-            OPENSSL_STATIC = true;
-            OPENSSL_DIR = "${pkgs.pkgsStatic.openssl}";
-            OPENSSL_LIB_DIR = "${pkgs.pkgsStatic.openssl.out}/lib";
-            OPENSSL_INCLUDE_DIR = "${pkgs.pkgsStatic.openssl.dev}/include";
-          };
-
-          devShell = pkgs.mkShell {
-            nativeBuildInputs = staticInputs;
-
-            shellHook = ''
-              export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C target-feature=+crt-static"
-              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C target-feature=+crt-static"
-
-              export OPENSSL_STATIC=1
-              export OPENSSL_DIR="${pkgs.pkgsStatic.openssl}"
-              export OPENSSL_LIB_DIR="${pkgs.pkgsStatic.openssl.out}/lib"
-              export OPENSSL_INCLUDE_DIR="${pkgs.pkgsStatic.openssl.dev}/include"
-            '';
-          };
-        }));
+        formatter = pkgs.nixfmt;
+      });
 }
