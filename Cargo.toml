@@ -57,5 +57,8 @@ xdg = "2"
 # terminal coloring
 ansi_term = "0.12"
 
+[dev-dependencies]
+tempfile = "3"
+
 [features]
 default = []
