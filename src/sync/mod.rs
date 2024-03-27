@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use crate::{
     batch::batch,
-    repo::{Repo, RepoError, Repos},
+    repo::{LocalRepoState, Repo, RepoError, Repos},
 };
 
 impl crate::GTree {
@@ -22,12 +22,11 @@ impl Repo {
     pub fn sync(&mut self) -> Result<SyncResult, SyncResult> {
         let repo_name = self.name.clone();
 
-        if self.repo.is_some()
-            && !self
-                .is_clean()
-                .map_err(|err| SyncResult::err(repo_name.clone(), err))?
-        {
-            return Ok(SyncResult::dirty(repo_name));
+        let repo_state = self
+            .is_clean()
+            .map_err(|err| SyncResult::err(repo_name.clone(), err))?;
+        if self.repo.is_some() && repo_state != LocalRepoState::Clean {
+            return Ok(SyncResult::dirty(repo_name, repo_state));
         };
 
         if self.repo.is_some() && self.forge.is_some() {
@@ -44,14 +43,12 @@ impl Repo {
                 .as_ref()
                 .ok_or_else(|| SyncResult::err(self.name.clone(), RepoError::NoRemoteFound))?;
 
-            let repo = self
-                .clone(url)
+            self.clone(url)
                 .map_err(|err| SyncResult::err(repo_name.clone(), err))?;
 
             // TODO detect moved repos based on first commit
             // ???? how to detect and not move forks?
 
-            self.repo = Some(repo);
             Ok(SyncResult::cloned(repo_name))
         } else {
             Ok(SyncResult::no_changes(repo_name))
@@ -62,7 +59,7 @@ impl Repo {
 #[derive(Debug)]
 pub enum SyncResult {
     NoChanges { name: String },
-    Dirty { name: String },
+    Dirty { name: String, state: LocalRepoState },
     Cloned { name: String },
     Pushed { name: String },
     Error { name: String, error: RepoError },
@@ -81,8 +78,8 @@ impl SyncResult {
         SyncResult::Pushed { name }
     }
 
-    pub fn dirty(name: String) -> SyncResult {
-        SyncResult::Dirty { name }
+    pub fn dirty(name: String, state: LocalRepoState) -> SyncResult {
+        SyncResult::Dirty { name, state }
     }
 
     pub fn no_changes(name: String) -> SyncResult {
@@ -98,9 +95,12 @@ impl Display for SyncResult {
             SyncResult::NoChanges { name } => {
                 f.write_fmt(format_args!("{} {}", Blue.paint("NOCHANGE"), name))
             }
-            SyncResult::Dirty { name } => {
-                f.write_fmt(format_args!("{} {}", Yellow.paint("DIRTY   "), name))
-            }
+            SyncResult::Dirty { name, state } => f.write_fmt(format_args!(
+                "{} {} [{}]",
+                Yellow.paint("DIRTY   "),
+                name,
+                state
+            )),
             SyncResult::Cloned { name } => {
                 f.write_fmt(format_args!("{} {}", Green.paint("CLONED  "), name))
             }

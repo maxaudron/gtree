@@ -1,14 +1,18 @@
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    path::PathBuf,
-    sync::RwLock,
-};
+use std::{collections::HashMap, fmt::Debug, path::PathBuf, sync::RwLock};
 
+use anyhow::Context;
 use thiserror::Error;
 
-use git2::{Branch, Remote, Repository};
-use tracing::{debug, trace};
+use gix::{
+    bstr::BString,
+    clone::checkout::main_worktree::ProgressId,
+    refs::{
+        transaction::{LogChange, PreviousValue, RefEdit},
+        FullName,
+    },
+    remote, Id, ObjectId, Progress, Remote, Repository,
+};
+use tracing::{debug, error};
 
 use crate::forge::Project;
 
@@ -30,125 +34,216 @@ pub struct Repo {
 }
 
 impl Repo {
-    pub fn is_clean(&self) -> Result<bool, RepoError> {
-        if let Some(repo) = &self.repo {
-            debug!("repo state: {:?}", repo.state());
-            let statuses: Vec<git2::Status> = repo
-                .statuses(None)?
-                .iter()
-                .filter_map(|status| {
-                    if status.status().is_ignored() {
-                        None
-                    } else {
-                        Some(status.status())
-                    }
-                })
-                .collect();
-
-            debug!("got repo statuses: {:?}", statuses);
-
-            if repo.state() == git2::RepositoryState::Clean && statuses.is_empty() {
-                Ok(true)
-            } else {
-                Ok(false)
-            }
-        } else {
-            Err(RepoError::NoLocalRepo)
+    pub fn repo(&self) -> Result<&Repository, RepoError> {
+        match &self.repo {
+            Some(repo) => Ok(repo),
+            None => Err(RepoError::NoLocalRepo),
         }
     }
 
-    pub fn main_remote<'a>(&self, repo: &'a Repository) -> Result<git2::Remote<'a>, RepoError> {
-        let remotes = repo.remotes()?;
-
-        let remote = if remotes.iter().any(|x| x == Some("origin")) {
-            "origin"
-        } else if let Some(remote) = remotes.get(0) {
-            remote
-        } else {
-            return Err(RepoError::NoRemoteFound);
-        };
-
-        return Ok(repo.find_remote(remote)?);
+    pub fn repo_mut(&mut self) -> Result<&mut Repository, RepoError> {
+        match &mut self.repo {
+            Some(repo) => Ok(repo),
+            None => Err(RepoError::NoLocalRepo),
+        }
     }
 
-    #[tracing::instrument(level = "trace", skip(remote))]
-    pub fn fetch<'a>(&self, remote: &mut Remote) -> Result<(), RepoError> {
-        // Pass an empty array as the refspec to fetch to fetch the "default" refspecs
-        // Type annotation is needed because type can't be guessed from the empty array
-        remote.fetch::<&str>(
-            &[],
-            Some(&mut crate::git::fetch_options()),
-            Some("gtree fetch"),
-        )?;
+    #[tracing::instrument(level = "debug")]
+    pub fn is_clean(&self) -> Result<LocalRepoState, RepoError> {
+        let repo = self.repo()?;
+
+        if let Some(state) = repo.state() {
+            Ok(LocalRepoState::InProgress(state))
+        } else {
+            let head = repo.head().unwrap();
+
+            if head.is_detached() {
+                return Ok(LocalRepoState::DetachedHead);
+            }
+
+            if head.is_unborn() {
+                return Ok(LocalRepoState::UnbornHead);
+            }
+
+            Ok(LocalRepoState::Clean)
+        }
+    }
+
+    pub fn default_remote(&self) -> Result<Remote, RepoError> {
+        Ok(self
+            .repo()?
+            .find_default_remote(gix::remote::Direction::Fetch)
+            .ok_or(RepoError::NoRemoteFound)?
+            .context("fetch: failed to find default remote")?)
+    }
+
+    pub fn default_branch(&self) -> Result<BString, RepoError> {
+        let repo = self.repo()?;
+        let remote = self.default_remote()?;
+        let remote_name = remote.name().context("remote does not have name")?;
+
+        let origin_ref = repo
+            .find_reference(&format!("remotes/{}/HEAD", remote_name.as_bstr()))
+            .context("the remotes HEAD references does not exist")?;
+
+        if let Some(origin_ref) = origin_ref.target().try_name() {
+            Ok(origin_ref.shorten().to_owned())
+        } else {
+            Err(RepoError::NoDefaultBranch)
+        }
+    }
+
+    #[tracing::instrument(level = "trace")]
+    pub fn clone(&self, url: &str) -> Result<(), RepoError> {
+        std::fs::create_dir_all(&self.path).unwrap();
+
+        let mut prepare_clone = gix::prepare_clone(url, &self.path).unwrap();
+
+        let (mut prepare_checkout, _) = prepare_clone
+            .fetch_then_checkout(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)
+            .unwrap();
+
+        let (_repo, _) = prepare_checkout
+            .main_worktree(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)
+            .unwrap();
 
         Ok(())
     }
 
     #[tracing::instrument(level = "trace")]
-    pub fn clone(&self, url: &str) -> Result<Repository, RepoError> {
-        let mut builder = git2::build::RepoBuilder::new();
-        builder.fetch_options(crate::git::fetch_options());
+    pub fn fetch<'a>(&mut self) -> Result<bool, RepoError> {
+        let remote = self.default_remote()?;
+        let conn = remote.connect(gix::remote::Direction::Fetch).unwrap();
+        let outcome = conn
+            .prepare_fetch(
+                gix::progress::Discard,
+                gix::remote::ref_map::Options::default(),
+            )
+            .context("fetch: failed to prepare patch")?
+            .receive(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)
+            .context("fetch: failed to receive")?;
 
-        builder.clone(url, &self.path).map_err(RepoError::GitError)
-    }
-
-    #[tracing::instrument(level = "trace")]
-    pub fn checkout(&self) -> Result<(), RepoError> {
-        if let Some(repo) = &self.repo {
-            repo.checkout_head(None).map_err(|e| e.into())
-        } else {
-            Err(RepoError::NoLocalRepo)
+        match outcome.status {
+            gix::remote::fetch::Status::NoPackReceived {
+                dry_run: _,
+                negotiate: _,
+                update_refs: _,
+            } => Ok(false),
+            gix::remote::fetch::Status::Change {
+                negotiate: _,
+                write_pack_bundle: _,
+                update_refs: _,
+            } => Ok(true),
         }
     }
 
-    pub fn branch_name(branch: &Branch) -> String {
-        match branch.name().unwrap() {
-            Some(s) => s.to_string(),
-            None => String::from_utf8_lossy(branch.name_bytes().unwrap()).to_string(),
+    pub fn refedit(target: ObjectId, name: &str, message: &str) -> RefEdit {
+        RefEdit {
+            change: gix::refs::transaction::Change::Update {
+                log: LogChange {
+                    mode: gix::refs::transaction::RefLog::AndReference,
+                    force_create_reflog: false,
+                    message: message.into(),
+                },
+                expected: PreviousValue::Any,
+                new: gix::refs::Target::Peeled(target),
+            },
+            name: FullName::try_from(name).unwrap(),
+            deref: true,
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(repo, local, upstream))]
-    pub fn merge(
+    pub fn update_default_branch_ref(
         &self,
-        repo: &Repository,
-        local: &mut Branch,
-        upstream: &Branch,
-    ) -> Result<bool, RepoError> {
-        let local_name = Repo::branch_name(local);
-        let upstream_name = Repo::branch_name(upstream);
+        remote: remote::Name,
+        head: Id,
+    ) -> Result<(), RepoError> {
+        let default_branch = self.default_branch()?;
+        let repo = self.repo()?;
 
-        let local_ref = local.get_mut();
-        let upstream_ref = upstream.get();
+        repo.edit_reference(Repo::refedit(
+            head.into(),
+            &format!("heads/{}", default_branch),
+            &format!("checkout: {}/HEAD with gtree", remote.as_bstr()),
+        ))
+        .context("checkout: failed to edit ref")?;
 
-        let analysis = repo.merge_analysis_for_ref(
-            local_ref,
-            &[&repo.reference_to_annotated_commit(upstream_ref)?],
-        )?;
+        Ok(())
+    }
 
-        if analysis.0.is_fast_forward() {
-            trace!("Doing a fast forward");
+    pub fn default_remote_head(&self) -> Result<(remote::Name, Id), RepoError> {
+        let repo = self.repo()?;
 
-            let msg = format!(
-                "gtree: update repo branch: {} to {}",
-                local_name, upstream_name
-            );
-            debug!("{}", msg);
+        let remote = repo
+            .find_fetch_remote(None)
+            .context("could not find remote to fetch")?;
+        let remote = remote.name().context("remote does not have name")?;
 
-            // sets the branch to target the new commit
-            // of the remote branch it's tracking
-            local_ref.set_target(upstream_ref.target().unwrap(), &msg)?;
-            // Apply these changes in the working dir if the branch is currently checked out.
-            if format!("refs/heads/{}", local_name) == self.default_branch {
-                repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?
-            }
+        let head_ref = repo
+            .find_reference(&format!("remotes/{}/HEAD", remote.as_bstr()))
+            .context("the remotes HEAD references does not exist")?;
+        let head = head_ref
+            .into_fully_peeled_id()
+            .context("failed to peel ref")?;
 
-            Ok(true)
-        } else if analysis.0.is_up_to_date() {
-            Ok(false)
-        } else {
-            Err(RepoError::NoFF)
-        }
+        Ok((remote.to_owned(), head.to_owned()))
+    }
+
+    #[tracing::instrument(level = "trace", skip(progress))]
+    pub fn checkout(
+        &self,
+        remote: remote::Name,
+        head: Id,
+        progress: &mut dyn gix::progress::DynNestedProgress,
+    ) -> Result<(), RepoError> {
+        let repo = self.repo()?;
+
+        let workdir = repo.work_dir().ok_or(RepoError::NoWorktree)?;
+        let head_tree = head
+            .object()
+            .context("could not find object HEAD points to")?
+            .peel_to_tree()
+            .context("failed to peel HEAD object")?
+            .id();
+
+        let index =
+            gix_index::State::from_tree(&head_tree, &repo.objects).context("index from tree")?;
+        let mut index = gix_index::File::from_state(index, repo.index_path());
+
+        let mut files =
+            progress.add_child_with_id("checkout".to_string(), ProgressId::CheckoutFiles.into());
+        let mut bytes =
+            progress.add_child_with_id("writing".to_string(), ProgressId::BytesWritten.into());
+
+        files.init(Some(index.entries().len()), gix::progress::count("files"));
+        bytes.init(None, gix::progress::bytes());
+
+        let start = std::time::Instant::now();
+
+        debug!("workdir: {:?}", workdir);
+        let opts = gix_worktree_state::checkout::Options::default();
+        let outcome = gix_worktree_state::checkout(
+            &mut index,
+            workdir,
+            repo.objects.clone().into_arc().unwrap(),
+            &files,
+            &bytes,
+            &gix::interrupt::IS_INTERRUPTED,
+            opts,
+        )
+        .context("checkout: failed");
+
+        files.show_throughput(start);
+        bytes.show_throughput(start);
+
+        debug!("outcome: {:?}", outcome);
+        debug!("is interrupted: {:?}", &gix::interrupt::IS_INTERRUPTED);
+
+        index
+            .write(Default::default())
+            .context("checkout: write index")?;
+
+        Ok(())
     }
 }
 
@@ -158,14 +253,30 @@ pub enum RepoError {
     NoLocalRepo,
     #[error("local git repo does not have a remote")]
     NoRemoteFound,
-    #[error("repository is dirty")]
-    Dirty,
+    #[error("could not determine default branch based on remote HEAD")]
+    NoDefaultBranch,
+    #[error("repo is not checked out")]
+    NoWorktree,
+    #[error("repository is dirty: {0}")]
+    Dirty(LocalRepoState),
     #[error("fast-forward merge was not possible")]
     NoFF,
-    #[error("error during git operation {0}")]
-    GitError(#[from] git2::Error),
+    #[error("error: {0}")]
+    Anyhow(#[from] anyhow::Error),
     #[error("unknown repo error")]
     Unknown,
+}
+
+#[derive(Error, Debug, PartialEq)]
+pub enum LocalRepoState {
+    #[error("operation in progress: {0:?}")]
+    InProgress(gix::state::InProgress),
+    #[error("head is detached")]
+    DetachedHead,
+    #[error("head is unborn")]
+    UnbornHead,
+    #[error("repo is clean")]
+    Clean,
 }
 
 impl Ord for Repo {

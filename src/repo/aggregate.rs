@@ -1,11 +1,7 @@
-use std::{
-    collections::HashMap,
-    sync::RwLock,
-};
+use std::{collections::HashMap, os::unix::ffi::OsStrExt, sync::RwLock};
 
-use git2::Repository;
-
-use tracing::error;
+use gix::bstr::ByteSlice;
+use tracing::{debug, error};
 use walkdir::WalkDir;
 
 use crate::forge::Project;
@@ -25,7 +21,7 @@ impl Aggregator for Repos {
     fn from_local(root: &str, scope: &str) -> Repos {
         let mut repos = HashMap::new();
 
-        let path: std::path::PathBuf = [root, scope].iter().collect();
+        let path: std::path::PathBuf = root.into();
 
         if !path.exists() {
             return repos;
@@ -40,7 +36,8 @@ impl Aggregator for Repos {
                 Some(Ok(entry)) => entry,
             };
 
-            if entry.file_type().is_dir() {
+            if entry.file_type().is_dir() && entry.path().as_os_str().as_bytes().contains_str(scope)
+            {
                 let mut dir = std::fs::read_dir(entry.path()).unwrap();
 
                 if dir.any(|dir| {
@@ -52,7 +49,9 @@ impl Aggregator for Repos {
                 }) {
                     walker.skip_current_dir();
 
-                    match Repository::open(entry.path()) {
+                    debug!("found git repo {:?} trying to open...", entry.path());
+
+                    match gix::open(entry.path()) {
                         Ok(repo) => {
                             let name = entry
                                 .path()
@@ -104,8 +103,7 @@ impl Aggregator for Repos {
         local = local
             .into_iter()
             .map(|(left_name, left)| {
-                if let Some(right) = remote.remove(&left_name)
-                {
+                if let Some(right) = remote.remove(&left_name) {
                     left.write().unwrap().forge = right.into_inner().unwrap().forge;
                 }
 
