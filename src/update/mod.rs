@@ -1,11 +1,10 @@
 use std::fmt::{Debug, Display};
 
-use git2::BranchType;
 use tracing::debug;
 
 use crate::{
     batch::batch,
-    repo::{Repo, RepoError, Repos},
+    repo::{LocalRepoState, Repo, RepoError, Repos},
 };
 
 impl crate::GTree {
@@ -35,51 +34,52 @@ impl Repo {
     }
 
     fn update_inner(&mut self) -> Result<UpdateResult, RepoError> {
-        let repo = self.repo.as_ref().unwrap();
-        let mut remote = self.main_remote(repo)?;
+        let repo_state = self.is_clean()?;
+        if self.repo.is_some() && repo_state != LocalRepoState::Clean {
+            return Ok(UpdateResult::dirty(self.name.clone(), repo_state));
+        };
 
-        self.fetch(&mut remote)?;
+        debug!("repo is clean");
 
-        self.default_branch = remote.default_branch()?.as_str().unwrap().to_string();
+        let mut progress = gix::progress::Discard {};
 
-        debug!("default branch: {}", self.default_branch);
+        let _fetched = self.fetch()?;
+        let (remote, head) = self.default_remote_head()?;
+        self.update_default_branch_ref(remote.clone(), head)?;
+        self.checkout(remote, head, &mut progress)?;
 
-        if self.is_clean()? {
-            debug!("repo is clean");
+        // let merged = repo.branches(Some(BranchType::Local))?
+        //         .filter_map(|x| x.ok())
+        //         .try_fold(false, |mut merged, (mut branch, _)| {
+        //             let name = format!("refs/heads/{}", Repo::branch_name(&branch));
 
-            let merged = repo.branches(Some(BranchType::Local))?
-                    .filter_map(|x| x.ok())
-                    .try_fold(false, |mut merged, (mut branch, _)| {
-                        let name = format!("refs/heads/{}", Repo::branch_name(&branch));
+        //             if branch.upstream().is_ok() {
+        //                 let upstream = branch.upstream().unwrap();
 
-                        if branch.upstream().is_ok() {
-                            let upstream = branch.upstream().unwrap();
+        //                 debug!("branch: {}", name);
 
-                            debug!("branch: {}", name);
+        //                 merged |= self.merge(repo, &mut branch, &upstream)?;
+        //                 Ok::<bool, RepoError>(merged)
+        //             } else {
+        //                 debug!("not updating branch: {}: branch does not have upstream tracking branch set", name);
+        //                 Ok(merged)
+        //             }
+        //         })?;
 
-                            merged |= self.merge(repo, &mut branch, &upstream)?;
-                            Ok::<bool, RepoError>(merged)
-                        } else {
-                            debug!("not updating branch: {}: branch does not have upstream tracking branch set", name);
-                            Ok(merged)
-                        }
-                    })?;
+        // if merged {
+        //     Ok(UpdateResult::merged(self.name.clone()))
+        // } else {
+        //     Ok(UpdateResult::no_changes(self.name.clone()))
+        // }
 
-            if merged {
-                Ok(UpdateResult::merged(self.name.clone()))
-            } else {
-                Ok(UpdateResult::no_changes(self.name.clone()))
-            }
-        } else {
-            Ok(UpdateResult::dirty(self.name.clone()))
-        }
+        Ok(UpdateResult::no_changes(self.name.clone()))
     }
 }
 
 #[derive(Debug)]
 pub enum UpdateResult {
     NoChanges { name: String },
-    Dirty { name: String },
+    Dirty { name: String, state: LocalRepoState },
     Merged { name: String },
     Error { name: String, error: RepoError },
 }
@@ -93,8 +93,8 @@ impl UpdateResult {
         UpdateResult::Merged { name }
     }
 
-    pub fn dirty(name: String) -> UpdateResult {
-        UpdateResult::Dirty { name }
+    pub fn dirty(name: String, state: LocalRepoState) -> UpdateResult {
+        UpdateResult::Dirty { name, state }
     }
 
     pub fn no_changes(name: String) -> UpdateResult {
@@ -110,9 +110,12 @@ impl Display for UpdateResult {
             UpdateResult::NoChanges { name } => {
                 f.write_fmt(format_args!("{} {}", Blue.paint("FETCHED"), name))
             }
-            UpdateResult::Dirty { name } => {
-                f.write_fmt(format_args!("{} {}", Yellow.paint("DIRTY  "), name))
-            }
+            UpdateResult::Dirty { name, state } => f.write_fmt(format_args!(
+                "{} {} [{}]",
+                Yellow.paint("DIRTY  "),
+                name,
+                state
+            )),
             UpdateResult::Merged { name } => {
                 f.write_fmt(format_args!("{} {}", Green.paint("PULLED "), name))
             }
