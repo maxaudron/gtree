@@ -13,7 +13,7 @@ impl Repo {
     #[tracing::instrument(level = "trace", skip(progress))]
     pub fn checkout(
         &self,
-        remote: remote::Name,
+        remote: &remote::Name,
         head: Id,
         progress: &mut dyn progress::DynNestedProgress,
     ) -> Result<(), RepoError> {

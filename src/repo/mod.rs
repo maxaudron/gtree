@@ -8,8 +8,8 @@ use tracing::error;
 use crate::forge::Project;
 
 mod aggregate;
-mod git;
 mod repostate;
+mod git;
 
 pub use aggregate::*;
 pub use repostate::*;

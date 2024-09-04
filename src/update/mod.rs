@@ -45,8 +45,13 @@ impl Repo {
 
         let _fetched = self.fetch()?;
         let (remote, head) = self.default_remote_head()?;
-        self.update_default_branch_ref(remote.clone(), head)?;
-        self.checkout(remote, head, &mut progress)?;
+        debug!("default remote and head: {:?} {:?}", remote, head);
+        // TODO do not update if there are unpushed commits
+        self.update_default_branch_ref(&remote, head)?;
+        debug!("updated default branch reference");
+        // TODO check out only if the default branch is currently checked out
+        self.checkout(&remote, head, &mut progress)?;
+        debug!("finished checkout");
 
         // let merged = repo.branches(Some(BranchType::Local))?
         //         .filter_map(|x| x.ok())

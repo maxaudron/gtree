@@ -9,8 +9,10 @@ use gix::{
     },
     remote, Id, ObjectId, Remote,
 };
+use tracing::debug;
 
 mod checkout;
+mod ffmerge;
 mod fetch;
 
 impl Repo {
@@ -52,8 +54,11 @@ impl Repo {
             .find_reference(&format!("remotes/{}/HEAD", remote_name.as_bstr()))
             .context("the remotes HEAD references does not exist")?;
 
+        debug!("got ref to origin: {:?}", origin_ref);
+
         if let Some(origin_ref) = origin_ref.target().try_name() {
-            Ok(origin_ref.shorten().to_owned())
+            let shortened = origin_ref.shorten().to_owned();
+            Ok(shortened.split(|x| *x == b'/').last().unwrap().into())
         } else {
             Err(RepoError::NoDefaultBranch)
         }
@@ -77,18 +82,22 @@ impl Repo {
 
     pub fn update_default_branch_ref(
         &self,
-        remote: remote::Name,
+        remote: &remote::Name,
         head: Id,
     ) -> Result<(), RepoError> {
         let default_branch = self.default_branch()?;
+        debug!("default branch: {:?}", default_branch);
+
         let repo = self.repo()?;
 
-        repo.edit_reference(Repo::refedit(
+        let edits = repo.edit_reference(Repo::refedit(
             head.into(),
-            &format!("heads/{}", default_branch),
+            &format!("refs/heads/{}", default_branch),
             &format!("checkout: {}/HEAD with gtree", remote.as_bstr()),
         ))
         .context("checkout: failed to edit ref")?;
+
+        debug!("ref edits: {:?}", edits);
 
         Ok(())
     }
