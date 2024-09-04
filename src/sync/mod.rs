@@ -22,12 +22,12 @@ impl Repo {
     pub fn sync(&mut self) -> Result<SyncResult, SyncResult> {
         let repo_name = self.name.clone();
 
-        let repo_state = self
-            .is_clean()
-            .map_err(|err| SyncResult::err(repo_name.clone(), err))?;
-        if self.repo.is_some() && repo_state != LocalRepoState::Clean {
-            return Ok(SyncResult::dirty(repo_name, repo_state));
-        };
+        // let repo_state = self
+        //     .is_clean()
+        //     .map_err(|err| SyncResult::err(repo_name.clone(), err))?;
+        // if self.repo.is_some() && repo_state != LocalRepoState::Clean {
+        //     return Ok(SyncResult::dirty(repo_name, repo_state));
+        // };
 
         if self.repo.is_some() && self.forge.is_some() {
             Ok(SyncResult::no_changes(repo_name))
