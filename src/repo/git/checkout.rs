@@ -6,6 +6,7 @@ use gix::{
     Progress,
 };
 
+use gix::validate::path::component::Options;
 use gix_index::{File, State};
 use tracing::debug;
 
@@ -27,7 +28,8 @@ impl Repo {
             .context("failed to peel HEAD object")?
             .id();
 
-        let index = State::from_tree(&head_tree, &repo.objects).context("index from tree")?;
+        let index = State::from_tree(&head_tree, &repo.objects, Options::default())
+            .context("index from tree")?;
         let mut index = File::from_state(index, repo.index_path());
 
         let mut files =
