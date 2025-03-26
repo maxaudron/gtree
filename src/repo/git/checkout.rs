@@ -1,6 +1,7 @@
 use super::{Repo, RepoError};
 
 use anyhow::Context;
+use gix::bstr::ByteSlice;
 use gix::{
     clone::checkout::main_worktree::ProgressId, interrupt::IS_INTERRUPTED, progress, remote, Id,
     Progress,
@@ -31,6 +32,13 @@ impl Repo {
         let index = State::from_tree(&head_tree, &repo.objects, Options::default())
             .context("index from tree")?;
         let mut index = File::from_state(index, repo.index_path());
+
+        let status = repo
+            .status(gix::progress::Discard)
+            .unwrap()
+            .index(index.clone().into())
+            .into_iter([])
+            .unwrap();
 
         let mut files =
             progress.add_child_with_id("checkout".to_string(), ProgressId::CheckoutFiles.into());
@@ -64,6 +72,23 @@ impl Repo {
         index
             .write(Default::default())
             .context("checkout: write index")?;
+
+        status
+            .filter_map(|item| item.ok())
+            .filter_map(|item| match item {
+                gix::status::Item::IndexWorktree(_) => None,
+                gix::status::Item::TreeIndex(i) => Some(i),
+            })
+            .for_each(|change| match change {
+                gix::diff::index::ChangeRef::Deletion { location, .. }
+                | gix::diff::index::ChangeRef::Rewrite { location, .. } => {
+                    let mut path = std::path::PathBuf::from(workdir);
+                    path.push(location.as_bstr().to_str().unwrap());
+                    debug!("removing deleted or renamed file: {:?}", path);
+                    std::fs::remove_file(path).unwrap()
+                }
+                _ => (),
+            });
 
         Ok(())
     }
