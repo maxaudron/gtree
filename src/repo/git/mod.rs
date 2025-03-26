@@ -12,8 +12,8 @@ use gix::{
 use tracing::debug;
 
 mod checkout;
-mod ffmerge;
 mod fetch;
+mod ffmerge;
 
 impl Repo {
     #[tracing::instrument(level = "debug")]
@@ -73,7 +73,7 @@ impl Repo {
                     message: message.into(),
                 },
                 expected: PreviousValue::Any,
-                new: gix::refs::Target::Peeled(target),
+                new: gix::refs::Target::Object(target),
             },
             name: FullName::try_from(name).unwrap(),
             deref: true,
@@ -90,12 +90,13 @@ impl Repo {
 
         let repo = self.repo()?;
 
-        let edits = repo.edit_reference(Repo::refedit(
-            head.into(),
-            &format!("refs/heads/{}", default_branch),
-            &format!("checkout: {}/HEAD with gtree", remote.as_bstr()),
-        ))
-        .context("checkout: failed to edit ref")?;
+        let edits = repo
+            .edit_reference(Repo::refedit(
+                head.into(),
+                &format!("refs/heads/{}", default_branch),
+                &format!("checkout: {}/HEAD with gtree", remote.as_bstr()),
+            ))
+            .context("checkout: failed to edit ref")?;
 
         debug!("ref edits: {:?}", edits);
 
