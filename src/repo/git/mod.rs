@@ -57,8 +57,10 @@ impl Repo {
         debug!("got ref to origin: {:?}", origin_ref);
 
         if let Some(origin_ref) = origin_ref.target().try_name() {
-            let shortened = origin_ref.shorten().to_owned();
-            Ok(shortened.split(|x| *x == b'/').last().unwrap().into())
+            let shortened = origin_ref.shorten().to_string();
+
+            let strip: String = format!("{}/", remote_name.as_bstr());
+            Ok(shortened.strip_prefix(&strip).unwrap().into())
         } else {
             Err(RepoError::NoDefaultBranch)
         }
