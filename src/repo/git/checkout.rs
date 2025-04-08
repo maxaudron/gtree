@@ -21,7 +21,7 @@ impl Repo {
     ) -> Result<(), RepoError> {
         let repo = self.repo()?;
 
-        let workdir = repo.work_dir().ok_or(RepoError::NoWorktree)?;
+        let workdir = repo.workdir().ok_or(RepoError::NoWorktree)?;
         let head_tree = head
             .object()
             .context("could not find object HEAD points to")?

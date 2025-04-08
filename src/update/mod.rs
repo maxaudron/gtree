@@ -1,6 +1,5 @@
 use std::fmt::{Debug, Display};
 
-use gix::bstr::ByteSlice;
 use tracing::debug;
 
 use crate::{
@@ -61,30 +60,6 @@ impl Repo {
         }
 
         Ok(UpdateResult::no_changes(self.name.clone()))
-
-        // let merged = repo.branches(Some(BranchType::Local))?
-        //         .filter_map(|x| x.ok())
-        //         .try_fold(false, |mut merged, (mut branch, _)| {
-        //             let name = format!("refs/heads/{}", Repo::branch_name(&branch));
-
-        //             if branch.upstream().is_ok() {
-        //                 let upstream = branch.upstream().unwrap();
-
-        //                 debug!("branch: {}", name);
-
-        //                 merged |= self.merge(repo, &mut branch, &upstream)?;
-        //                 Ok::<bool, RepoError>(merged)
-        //             } else {
-        //                 debug!("not updating branch: {}: branch does not have upstream tracking branch set", name);
-        //                 Ok(merged)
-        //             }
-        //         })?;
-
-        // if merged {
-        //     Ok(UpdateResult::merged(self.name.clone()))
-        // } else {
-        //     Ok(UpdateResult::no_changes(self.name.clone()))
-        // }
     }
 }
 
