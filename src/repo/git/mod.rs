@@ -2,12 +2,12 @@ use super::{LocalRepoState, Repo, RepoError};
 
 use anyhow::Context;
 use gix::{
-    bstr::BString,
+    bstr::{BString, ByteSlice},
     refs::{
         transaction::{LogChange, PreviousValue, RefEdit},
         FullName,
     },
-    remote, Id, ObjectId, Remote,
+    remote, Id, ObjectId, Reference, Remote,
 };
 use tracing::debug;
 
@@ -33,6 +33,34 @@ impl Repo {
                 return Ok(LocalRepoState::UnbornHead);
             }
 
+            let head = self.repo()?.head().unwrap();
+            let branch = head.referent_name().unwrap();
+            let default_branch = self.default_branch()?;
+
+            if !branch.as_bstr().contains_str(default_branch) {
+                return Ok(LocalRepoState::NonDefaultBranch);
+            }
+
+            let default_ref = self.default_remote_ref()?.into_fully_peeled_id().unwrap();
+
+            let head_ref = repo
+                .head_ref()
+                .map_err(|_| RepoError::NoHead)?
+                .ok_or(RepoError::NoHead)?
+                .into_fully_peeled_id()
+                .unwrap();
+
+            let unpushed_commits = head_ref
+                .ancestors()
+                .with_boundary([default_ref])
+                .all()
+                .unwrap()
+                .count();
+
+            if default_ref != head_ref && unpushed_commits > 0 {
+                return Ok(LocalRepoState::UnpushedCommits(unpushed_commits));
+            }
+
             Ok(LocalRepoState::Clean)
         }
     }
@@ -45,7 +73,7 @@ impl Repo {
             .context("fetch: failed to find default remote")?)
     }
 
-    pub fn default_branch(&self) -> Result<BString, RepoError> {
+    pub fn default_remote_ref(&self) -> Result<Reference, RepoError> {
         let repo = self.repo()?;
         let remote = self.default_remote()?;
         let remote_name = remote.name().context("remote does not have name")?;
@@ -55,6 +83,14 @@ impl Repo {
             .context("the remotes HEAD references does not exist")?;
 
         debug!("got ref to origin: {:?}", origin_ref);
+
+        Ok(origin_ref)
+    }
+
+    pub fn default_branch(&self) -> Result<BString, RepoError> {
+        let remote = self.default_remote()?;
+        let remote_name = remote.name().context("remote does not have name")?;
+        let origin_ref = self.default_remote_ref()?;
 
         if let Some(origin_ref) = origin_ref.target().try_name() {
             let shortened = origin_ref.shorten().to_string();

@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 
+use gix::bstr::ByteSlice;
 use tracing::debug;
 
 use crate::{
@@ -43,16 +44,23 @@ impl Repo {
 
         let mut progress = gix::progress::Discard {};
 
-        let _fetched = self.fetch()?;
-        let (remote, head) = self.default_remote_head()?;
-        debug!("default remote and head: {:?} {:?}", remote, head);
-        // TODO check out only if the default branch is currently checked out
-        self.checkout(&remote, head, &mut progress)?;
-        debug!("finished checkout");
+        let fetched = self.fetch()?;
 
-        // TODO do not update if there are unpushed commits
-        self.update_default_branch_ref(&remote, head)?;
-        debug!("updated default branch reference");
+        if fetched {
+            let (remote, head_id) = self.default_remote_head()?;
+            debug!("default remote and head: {:?} {:?}", remote, head_id);
+
+            self.checkout(&remote, head_id, &mut progress)?;
+            debug!("finished checkout");
+
+            // TODO do not update if there are unpushed commits
+            self.update_default_branch_ref(&remote, head_id)?;
+            debug!("updated default branch reference");
+
+            return Ok(UpdateResult::merged(self.name.clone()));
+        }
+
+        Ok(UpdateResult::no_changes(self.name.clone()))
 
         // let merged = repo.branches(Some(BranchType::Local))?
         //         .filter_map(|x| x.ok())
@@ -77,8 +85,6 @@ impl Repo {
         // } else {
         //     Ok(UpdateResult::no_changes(self.name.clone()))
         // }
-
-        Ok(UpdateResult::no_changes(self.name.clone()))
     }
 }
 

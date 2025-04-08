@@ -8,8 +8,8 @@ use tracing::error;
 use crate::forge::Project;
 
 mod aggregate;
-mod repostate;
 mod git;
+mod repostate;
 
 pub use aggregate::*;
 pub use repostate::*;
@@ -47,6 +47,8 @@ pub enum RepoError {
     NoLocalRepo,
     #[error("local git repo does not have a remote")]
     NoRemoteFound,
+    #[error("no head found")]
+    NoHead,
     #[error("could not determine default branch based on remote HEAD")]
     NoDefaultBranch,
     #[error("repo is not checked out")]
@@ -65,6 +67,10 @@ pub enum RepoError {
 pub enum LocalRepoState {
     #[error("operation in progress: {0:?}")]
     InProgress(gix::state::InProgress),
+    #[error("currently checked out branch is not default")]
+    NonDefaultBranch,
+    #[error("{0} unpushed commits")]
+    UnpushedCommits(usize),
     #[error("head is detached")]
     DetachedHead,
     #[error("head is unborn")]
