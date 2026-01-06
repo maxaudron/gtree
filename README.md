@@ -1,13 +1,10 @@
+[![git mirror](https://img.shields.io/badge/git-repo-cba6f7?logo=git&link=https%3A%2F%2Fgit.vapor.systems%2Fgtree.git)](https://git.vapor.systems/gtree.git)
+[![github mirror](https://img.shields.io/badge/github-repo-blue?logo=github&link=https%3A%2F%2Fgithub.com%2Fmaxaudron%2Fgtree)](https://github.com/maxaudron/gtree)
+[![gitlab mirror](https://img.shields.io/badge/gitlab-repo-orange?logo=github&link=https%3A%2F%2Fgitlab.com%2Fcocainefarm%2Fgtree)](https://gitlab.com/cocainefarm/gtree)
 
 # Table of Contents
 
-1.  [Usage](#org86116bf)
-2.  [Config](#org4e7be59)
-
 A tool to clone and pull whole group trees from a git forge, properly organized on disk.
-
-
-<a id="org86116bf"></a>
 
 # Usage
 
@@ -29,9 +26,6 @@ A tool to clone and pull whole group trees from a git forge, properly organized 
         list      List Directories
         sync      Download new repositories and delete old ones, also update
         update    Pull and Push new commits to and from the cloned repos
-
-
-<a id="org4e7be59"></a>
 
 # Config
 
