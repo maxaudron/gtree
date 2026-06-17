@@ -27,6 +27,7 @@ impl Repo {
             let branch = head.shorthand()?;
             let default_branch = self.default_branch()?;
 
+            debug!("branch: {branch}, default_branch: {default_branch}");
             if !branch.contains(&default_branch) {
                 return Ok(LocalRepoState::NonDefaultBranch);
             }
@@ -35,9 +36,9 @@ impl Repo {
 
             let head_ref = head.peel_to_commit()?;
 
-            let unpushed_commits = head_ref
+            let unpushed_commits = default_ref
                 .parents()
-                .take_while(|c| c.id() != default_ref.id())
+                .take_while(|c| c.id() != head_ref.id())
                 .count();
 
             if default_ref.id() != head_ref.id() && unpushed_commits > 0 {
@@ -76,7 +77,7 @@ impl Repo {
         let remote_name = remote.name()?.ok_or(RepoError::NoRemoteFound)?;
 
         let origin_ref = repo
-            .find_reference(&format!("remotes/{}/HEAD", remote_name))
+            .find_reference(&format!("refs/remotes/{}/HEAD", remote_name))
             .context("the remotes HEAD references does not exist")?;
 
         debug!("got ref to origin: {:?}", origin_ref.shorthand()?);
@@ -87,10 +88,12 @@ impl Repo {
     #[instrument(level = "debug", err)]
     pub fn default_branch(&self) -> Result<String, RepoError> {
         let mut remote = self.default_remote()?;
-        remote.connect(Direction::Fetch)?;
+        let (cb, _) = self.remote_callbacks();
+        remote.connect_auth(Direction::Fetch, Some(cb), None)?;
         remote
             .default_branch()
             .and_then(|s| Ok(s.as_str()?.to_owned()))
             .map_err(RepoError::from)
+            .map(|s| s.strip_prefix("refs/heads/").unwrap_or(&s).to_string())
     }
 }

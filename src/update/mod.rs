@@ -22,7 +22,7 @@ impl crate::GTree {
 
 impl Repo {
     /// Fetch any new state from the remote and fast forward merge changes into local branches
-    #[tracing::instrument(level = "trace")]
+    #[tracing::instrument(level = "trace", ret, err)]
     pub fn update(&mut self) -> Result<UpdateResult, UpdateResult> {
         let repo_name = self.name.clone();
         if self.repo.is_some() {
@@ -33,6 +33,7 @@ impl Repo {
         }
     }
 
+    #[tracing::instrument(level = "trace", ret, err)]
     fn update_inner(&mut self) -> Result<UpdateResult, RepoError> {
         let repo_state = self.is_clean()?;
         if self.repo.is_some() && repo_state != LocalRepoState::Clean {
@@ -98,7 +99,7 @@ impl Display for UpdateResult {
 
         match self {
             UpdateResult::NoChanges { name } => {
-                f.write_fmt(format_args!("{} {}", Blue.paint("FETCHED"), name))
+                f.write_fmt(format_args!("{} {}", Green.paint("UNCHANGED"), name))
             }
             UpdateResult::Dirty { name, state } => f.write_fmt(format_args!(
                 "{} {} [{}]",
@@ -107,7 +108,7 @@ impl Display for UpdateResult {
                 state
             )),
             UpdateResult::Merged { name } => {
-                f.write_fmt(format_args!("{} {}", Green.paint("PULLED "), name))
+                f.write_fmt(format_args!("{} {}", Blue.paint("PULLED "), name))
             }
             UpdateResult::Error { name, error } => f.write_fmt(format_args!(
                 "{} {} [{}]",

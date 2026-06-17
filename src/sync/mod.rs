@@ -18,7 +18,7 @@ impl crate::GTree {
 
 impl Repo {
     /// Clone repos from forge and push new repos to forge
-    #[tracing::instrument(level = "trace")]
+    #[tracing::instrument(level = "trace", ret, err)]
     pub fn sync(&mut self) -> Result<SyncResult, SyncResult> {
         let repo_name = self.name.clone();
 
@@ -89,11 +89,11 @@ impl SyncResult {
 
 impl Display for SyncResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use ansi_term::Colour::{Blue, Green, Red, Yellow};
+        use ansi_term::Colour::{Blue, Cyan, Green, Red, Yellow};
 
         match self {
             SyncResult::NoChanges { name } => {
-                f.write_fmt(format_args!("{} {}", Blue.paint("NOCHANGE"), name))
+                f.write_fmt(format_args!("{} {}", Green.paint("UNCHANGED"), name))
             }
             SyncResult::Dirty { name, state } => f.write_fmt(format_args!(
                 "{} {} [{}]",
@@ -102,10 +102,10 @@ impl Display for SyncResult {
                 state
             )),
             SyncResult::Cloned { name } => {
-                f.write_fmt(format_args!("{} {}", Green.paint("CLONED  "), name))
+                f.write_fmt(format_args!("{} {}", Cyan.paint("CLONED  "), name))
             }
             SyncResult::Pushed { name } => {
-                f.write_fmt(format_args!("{} {}", Green.paint("PUSHED  "), name))
+                f.write_fmt(format_args!("{} {}", Blue.paint("PUSHED  "), name))
             }
             SyncResult::Error { name, error } => f.write_fmt(format_args!(
                 "{} {} [{}]",

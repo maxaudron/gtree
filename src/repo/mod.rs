@@ -22,6 +22,9 @@ pub struct Repo {
     pub repo: Option<Repository>,
     pub forge: Option<Project>,
     pub default_branch: String,
+
+    /// knowns hosts as sha256 hashes
+    known_hosts: Vec<[u8; 32]>,
 }
 
 impl Repo {
@@ -140,6 +143,7 @@ impl Default for Repo {
             repo: Default::default(),
             forge: Default::default(),
             default_branch: "main".to_string(),
+            known_hosts: Default::default(),
         }
     }
 }

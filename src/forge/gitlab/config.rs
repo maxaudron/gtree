@@ -5,7 +5,6 @@ use crate::config::ForgeConfigTrait;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Deserialize, Serialize)]
 pub struct Gitlab {
-    // pub url: url::Url,
     pub host: String,
     pub token: String,
     pub directory: PathBuf,
@@ -13,6 +12,9 @@ pub struct Gitlab {
     pub tls: bool,
     #[serde(default)]
     pub auto_create_branches: bool,
+
+    #[serde(default)]
+    pub known_hosts: Vec<ssh_key::PublicKey>,
 }
 
 const fn default_tls() -> bool {
@@ -22,5 +24,9 @@ const fn default_tls() -> bool {
 impl ForgeConfigTrait for Gitlab {
     fn root(&self) -> &str {
         self.directory.to_str().unwrap()
+    }
+
+    fn known_hosts(&self) -> Vec<ssh_key::PublicKey> {
+        self.known_hosts.clone()
     }
 }
