@@ -90,7 +90,7 @@ impl GTree {
         let remote = Repos::from_forge(forge.root(), projects);
 
         let local = handle.join().unwrap();
-        let repos = Repos::aggregate(local, remote);
+        let repos = Repos::aggregate(local, remote, forge.known_hosts());
 
         match self.args.command {
             config::args::Commands::Sync => self.sync(repos),

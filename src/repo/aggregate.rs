@@ -11,7 +11,7 @@ use super::{Repo, Repos};
 pub trait Aggregator {
     fn from_local(root: &str, scope: &str) -> Repos;
     fn from_forge(root: &str, projects: Vec<Project>) -> Repos;
-    fn aggregate(local: Repos, remote: Repos) -> Repos;
+    fn aggregate(local: Repos, remote: Repos, known_hosts: Vec<ssh_key::PublicKey>) -> Repos;
 }
 
 #[async_trait::async_trait]
@@ -97,7 +97,15 @@ impl Aggregator for Repos {
     // the iteration is currently quite inefficient as
     // it's constantly removing stuff from `remote`
     #[tracing::instrument(level = "trace", skip(local, remote))]
-    fn aggregate(mut local: Repos, mut remote: Repos) -> Repos {
+    fn aggregate(
+        mut local: Repos,
+        mut remote: Repos,
+        known_hosts: Vec<ssh_key::PublicKey>,
+    ) -> Repos {
+        let known_hosts: Vec<[u8; 32]> = known_hosts
+            .iter()
+            .map(|k| k.fingerprint(ssh_key::HashAlg::Sha256).sha256().unwrap())
+            .collect();
         local = local
             .into_iter()
             .map(|(left_name, left)| {
@@ -110,6 +118,9 @@ impl Aggregator for Repos {
             .collect();
 
         local.extend(remote.into_iter());
+        local.iter_mut().for_each(|(_, r)| {
+            r.write().unwrap().known_hosts = known_hosts.clone();
+        });
         // local.sort();
 
         local

@@ -74,6 +74,7 @@ pub enum ForgeConfig {
 
 pub trait ForgeConfigTrait {
     fn root(&self) -> &str;
+    fn known_hosts(&self) -> Vec<ssh_key::PublicKey>;
 }
 
 impl Deref for ForgeConfig {
