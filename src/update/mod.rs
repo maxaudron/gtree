@@ -41,19 +41,22 @@ impl Repo {
 
         debug!("repo is clean");
 
-        let mut progress = gix::progress::Discard {};
-
         let fetched = self.fetch()?;
 
         if fetched {
-            let (remote, head_id) = self.default_remote_head()?;
-            debug!("default remote and head: {:?} {:?}", remote, head_id);
+            let remote = self.default_remote()?;
+            let head_id = self.default_remote_ref()?.peel_to_commit()?.id();
+            debug!(
+                "default remote and head: {:?} {:?}",
+                remote.name()?,
+                head_id
+            );
 
-            self.checkout(&remote, head_id, &mut progress)?;
+            self.checkout(head_id)?;
             debug!("finished checkout");
 
             // TODO do not update if there are unpushed commits
-            self.update_default_branch_ref(&remote, head_id)?;
+            // self.update_default_branch_ref(&remote, head_id)?;
             debug!("updated default branch reference");
 
             return Ok(UpdateResult::merged(self.name.clone()));

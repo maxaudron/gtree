@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::config::ForgeConfig;

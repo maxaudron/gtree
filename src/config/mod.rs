@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, ops::Deref};
 
 use figment::{
+    Error, Figment, Metadata, Profile, Provider,
     providers::{Format, Toml},
     value::{Dict, Map},
-    Error, Figment, Metadata, Profile, Provider,
 };
 
 use anyhow::{Context, Result};

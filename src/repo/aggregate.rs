@@ -1,6 +1,5 @@
-use std::{collections::HashMap, os::unix::ffi::OsStrExt, sync::RwLock};
+use std::{collections::HashMap, sync::RwLock};
 
-use gix::bstr::ByteSlice;
 use tracing::{debug, error};
 use walkdir::WalkDir;
 
@@ -36,8 +35,7 @@ impl Aggregator for Repos {
                 Some(Ok(entry)) => entry,
             };
 
-            if entry.file_type().is_dir() && entry.path().as_os_str().as_bytes().contains_str(scope)
-            {
+            if entry.file_type().is_dir() && entry.path().to_str().unwrap().contains(scope) {
                 let mut dir = std::fs::read_dir(entry.path()).unwrap();
 
                 if dir.any(|dir| {
@@ -51,7 +49,7 @@ impl Aggregator for Repos {
 
                     debug!("found git repo {:?} trying to open...", entry.path());
 
-                    match gix::open(entry.path()) {
+                    match git2::Repository::open(entry.path()) {
                         Ok(repo) => {
                             let name = entry
                                 .path()

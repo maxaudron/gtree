@@ -1,11 +1,11 @@
-use std::{thread, sync::Arc};
+use std::{sync::Arc, thread};
 
 use anyhow::{Context, Result};
 use clap::Parser;
 
 use tokio::runtime::Runtime;
-use tracing::{debug, metadata::LevelFilter, Level};
-use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, EnvFilter};
+use tracing::{Level, debug, metadata::LevelFilter};
+use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan, prelude::*};
 
 use crate::repo::{Aggregator, Repos};
 
@@ -52,7 +52,10 @@ impl GTree {
 
         RUNTIME.set(Runtime::new()?).unwrap();
 
-        let forge = RUNTIME.get().unwrap().block_on(forge::Forge::new(forge_config))?;
+        let forge = RUNTIME
+            .get()
+            .unwrap()
+            .block_on(forge::Forge::new(forge_config))?;
 
         Ok(GTree {
             figment,
@@ -67,19 +70,23 @@ impl GTree {
         let scope = Arc::new(self.args.scope.as_ref().map_or("", |x| x).to_string());
 
         // TODO select a specific forge
-        let forge = Arc::new(self
-            .config
-            .iter()
-            .next()
-            .context("No Forge configured, please setup a forge")?.1.clone());
+        let forge = Arc::new(
+            self.config
+                .iter()
+                .next()
+                .context("No Forge configured, please setup a forge")?
+                .1
+                .clone(),
+        );
 
         let scope_t = scope.clone();
         let forge_t = forge.clone();
-        let handle = thread::spawn(move || {
-            Repos::from_local(forge_t.root(), &scope_t)
-        });
+        let handle = thread::spawn(move || Repos::from_local(forge_t.root(), &scope_t));
 
-        let projects = RUNTIME.get().unwrap().block_on(self.forge.projects(&scope))?;
+        let projects = RUNTIME
+            .get()
+            .unwrap()
+            .block_on(self.forge.projects(&scope))?;
         let remote = Repos::from_forge(forge.root(), projects);
 
         let local = handle.join().unwrap();
