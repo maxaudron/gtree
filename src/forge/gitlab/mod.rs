@@ -45,7 +45,10 @@ impl super::ForgeTrait for Gitlab {
 
         let mut nodes = projects.nodes.unwrap().clone();
         if nodes.is_empty() {
-            return Err(anyhow::anyhow!("No projects found with search: {:?}", scope));
+            return Err(anyhow::anyhow!(
+                "No projects found with search: {:?}",
+                scope
+            ));
         };
 
         let mut page = projects.page_info.end_cursor.unwrap();

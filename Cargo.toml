@@ -2,7 +2,7 @@
 name = "gtree"
 description = "A tool to clone and pull whole group trees from a git forge, properly organized on disk."
 version = "1.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Max Audron <audron@cocaine.farm>"]
 license = "ISC"
 homepage = "https://gitlab.com/cocainefarm/gtree"
@@ -19,18 +19,7 @@ once_cell = "1"
 gitlab = "0.1710"
 graphql_client = "0.14"
 
-gix = { version = "0.71", default-features = false, features = [
-    "status",
-    "index",
-    "credentials",
-    "blocking-http-transport-reqwest-rust-tls",
-    "worktree-mutation",
-    "max-performance-safe",
-    "parallel",
-] }
-gix-worktree-state = "*"
-gix-index = "*"
-gix-validate = "*"
+git2 = { version = "0.21", features = ["ssh"] }
 
 walkdir = "2"
 

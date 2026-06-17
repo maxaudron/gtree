@@ -2,8 +2,7 @@ use std::{collections::HashMap, fmt::Debug, path::PathBuf, sync::RwLock};
 
 use thiserror::Error;
 
-use gix::Repository;
-use tracing::error;
+use git2::{Repository, RepositoryState};
 
 use crate::forge::Project;
 
@@ -57,6 +56,8 @@ pub enum RepoError {
     Dirty(LocalRepoState),
     #[error("fast-forward merge was not possible")]
     NoFF,
+    #[error("git error: {0}")]
+    Git(#[from] git2::Error),
     #[error("error: {0}")]
     Anyhow(#[from] anyhow::Error),
     #[error("unknown repo error")]
@@ -65,8 +66,8 @@ pub enum RepoError {
 
 #[derive(Error, Debug, PartialEq)]
 pub enum LocalRepoState {
-    #[error("operation in progress: {0:?}")]
-    InProgress(gix::state::InProgress),
+    #[error("{0:#?}")]
+    Other(RepositoryState),
     #[error("currently checked out branch is not default")]
     NonDefaultBranch,
     #[error("{0} unpushed commits")]

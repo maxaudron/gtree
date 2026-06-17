@@ -11,17 +11,9 @@ pub fn batch(repos: Repos, f: fn(RwLockWriteGuard<Repo>)) {
     let jobs = crate::GTREE.get().unwrap().args.jobs;
 
     let batch_size = if jobs != 0 {
-        if len <= jobs {
-            1
-        } else {
-            len / jobs
-        }
+        if len <= jobs { 1 } else { len / jobs }
     } else {
-        if len <= cpus {
-            1
-        } else {
-            len / cpus
-        }
+        if len <= cpus { 1 } else { len / cpus }
     };
 
     debug!(
