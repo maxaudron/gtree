@@ -32,6 +32,7 @@ impl Deref for Config {
 
 impl Config {
     // Allow the configuration to be extracted from any `Provider`.
+    #[allow(clippy::result_large_err)]
     pub fn from<T: Provider>(provider: T) -> Result<Config, Error> {
         Figment::from(provider).extract()
     }
