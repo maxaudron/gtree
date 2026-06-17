@@ -91,6 +91,7 @@ impl Ord for Repo {
 
 impl Eq for Repo {}
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Repo {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.name.partial_cmp(&other.name)
