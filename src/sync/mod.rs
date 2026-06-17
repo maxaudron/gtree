@@ -22,26 +22,17 @@ impl Repo {
     pub fn sync(&mut self) -> Result<SyncResult, SyncResult> {
         let repo_name = self.name.clone();
 
-        let repo_state = self
-            .is_clean()
-            .map_err(|err| SyncResult::err(repo_name.clone(), err))?;
-        if self.repo.is_some() && repo_state != LocalRepoState::Clean {
-            return Ok(SyncResult::dirty(repo_name, repo_state));
-        };
+        let repo_state = self.is_clean();
 
-        if self.repo.is_some() && self.forge.is_some() {
-            Ok(SyncResult::no_changes(repo_name))
-        } else if self.repo.is_some() {
-            // TODO do push stuff
-            Ok(SyncResult::pushed(repo_name))
-        } else if self.forge.is_some() {
+        if let Err(RepoError::NoLocalRepo) = repo_state {
             let url = self
                 .forge
                 .as_ref()
-                .unwrap()
+                .ok_or(SyncResult::err(repo_name.clone(), RepoError::NoRemoteFound))?
                 .ssh_clone_url
                 .as_ref()
-                .ok_or_else(|| SyncResult::err(self.name.clone(), RepoError::NoRemoteFound))?.clone();
+                .ok_or_else(|| SyncResult::err(self.name.clone(), RepoError::NoRemoteFound))?
+                .clone();
 
             self.clone(&url)
                 .map_err(|err| SyncResult::err(repo_name.clone(), err))?;
@@ -50,6 +41,21 @@ impl Repo {
             // ???? how to detect and not move forks?
 
             Ok(SyncResult::cloned(repo_name))
+        } else if let Err(err) = repo_state {
+            Ok(SyncResult::err(repo_name, err))
+        } else if let Ok(repo_state) = repo_state {
+            if self.repo.is_some() && repo_state != LocalRepoState::Clean {
+                return Ok(SyncResult::dirty(repo_name, repo_state));
+            };
+
+            if self.repo.is_some() && self.forge.is_some() {
+                Ok(SyncResult::no_changes(repo_name))
+            } else if self.repo.is_some() {
+                // TODO do push stuff
+                Ok(SyncResult::pushed(repo_name))
+            } else {
+                Ok(SyncResult::no_changes(repo_name))
+            }
         } else {
             Ok(SyncResult::no_changes(repo_name))
         }

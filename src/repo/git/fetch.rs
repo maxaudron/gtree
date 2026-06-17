@@ -2,17 +2,19 @@ use std::sync::{Arc, atomic::AtomicBool};
 
 use super::{Repo, RepoError};
 
-use git2::{FetchOptions, RemoteCallbacks, Repository};
+use git2::{FetchOptions, RemoteCallbacks, build::RepoBuilder};
 use tracing::debug;
 
 impl Repo {
     #[tracing::instrument(level = "trace")]
     pub fn clone(&mut self, url: &str) -> Result<(), RepoError> {
         std::fs::create_dir_all(&self.path).unwrap();
-
-        // TODO credential setup? ssh-agent?
-        let repo = Repository::clone(url, &self.path)?;
-        self.repo = Some(repo);
+        self.repo = Some({
+            let mut builder = RepoBuilder::new();
+            let (fo, _updated) = self.fetch_options();
+            builder.fetch_options(fo);
+            builder.clone(url, &self.path)?
+        });
 
         Ok(())
     }
