@@ -16,7 +16,7 @@ pub trait Aggregator {
 
 #[async_trait::async_trait]
 impl Aggregator for Repos {
-    #[tracing::instrument(level = "trace")]
+    #[tracing::instrument(level = "trace", ret)]
     fn from_local(root: &str, scope: &str) -> Repos {
         let mut repos = HashMap::new();
 
@@ -80,13 +80,14 @@ impl Aggregator for Repos {
         repos
     }
 
-    #[tracing::instrument(level = "trace")]
+    #[tracing::instrument(level = "trace", ret)]
     fn from_forge(root: &str, projects: Vec<Project>) -> Repos {
         projects
             .iter()
             .map(|project| {
                 let mut repo: Repo = project.into();
                 repo.path = [root, &repo.name].iter().collect();
+                debug!("repo path: {:#?}", repo.path);
                 (repo.name.clone(), RwLock::new(repo))
             })
             .collect()

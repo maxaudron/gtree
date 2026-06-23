@@ -132,7 +132,10 @@ impl std::fmt::Display for Repo {
 
 impl Debug for Repo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Repo").field("path", &self.name).finish()
+        f.debug_struct("Repo")
+            .field("name", &self.name)
+            .field("path", &self.path)
+            .finish()
     }
 }
 
