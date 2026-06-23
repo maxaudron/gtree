@@ -6,6 +6,9 @@ query Projects($scope: String!, $after: String!) {
       fullPath
       sshUrlToRepo
       httpUrlToRepo
+      repository {
+        rootRef
+      }
     }
 
     pageInfo {
