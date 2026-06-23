@@ -41,7 +41,7 @@ impl Config {
     pub fn figment() -> Result<Figment> {
         use figment::providers::Env;
 
-        let dirs = xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME")).unwrap();
+        let dirs = xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
 
         Ok(Figment::from(Toml::file(
             dirs.place_config_file("config.toml")
