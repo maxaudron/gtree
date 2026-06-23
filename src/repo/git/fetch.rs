@@ -8,6 +8,7 @@ use tracing::debug;
 impl Repo {
     #[tracing::instrument(level = "trace")]
     pub fn clone(&mut self, url: &str) -> Result<(), RepoError> {
+        debug!("cloning repo {url} to {:?}", self.path);
         std::fs::create_dir_all(&self.path).unwrap();
         self.repo = Some({
             let mut builder = RepoBuilder::new();

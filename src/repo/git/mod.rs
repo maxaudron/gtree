@@ -8,7 +8,7 @@ mod checkout;
 mod fetch;
 
 impl Repo {
-    #[instrument(level = "debug", ret, err)]
+    #[instrument(level = "debug", ret)]
     pub fn is_clean(&self) -> Result<LocalRepoState, RepoError> {
         let repo = self.repo()?;
 

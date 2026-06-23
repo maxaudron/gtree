@@ -65,7 +65,7 @@ impl GTree {
         })
     }
 
-    #[tracing::instrument(level = "trace")]
+    // #[tracing::instrument(level = "trace")]
     pub fn run(self) -> Result<()> {
         let scope = Arc::new(self.args.scope.as_ref().map_or("", |x| x).to_string());
 
