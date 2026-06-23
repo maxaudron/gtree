@@ -72,8 +72,9 @@ impl super::ForgeTrait for Gitlab {
 
         let res = nodes
             .into_iter()
-            .filter(|x| x.is_some())
-            .map(|x| x.unwrap().into())
+            .flatten()
+            .filter(|x| x.repository.is_some())
+            .map(|x| x.into())
             .collect();
 
         Ok(res)
