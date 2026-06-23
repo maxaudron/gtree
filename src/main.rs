@@ -11,13 +11,9 @@ use crate::repo::{Aggregator, Repos};
 
 pub mod config;
 pub mod forge;
-pub mod git;
 pub mod repo;
 
-mod list;
-mod sync;
-mod update;
-
+mod cmd;
 mod batch;
 
 #[cfg(test)]

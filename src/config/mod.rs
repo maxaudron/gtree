@@ -12,6 +12,8 @@ use figment::{
 
 use anyhow::{Context, Result};
 
+use crate::forge::gitlab;
+
 /// Configuration for the Bot
 #[derive(Clone, Debug, Deserialize, Serialize)]
 // pub struct Config();
@@ -70,7 +72,7 @@ impl Provider for Config {
 #[serde(tag = "type")]
 pub enum ForgeConfig {
     #[serde(alias = "gitlab")]
-    Gitlab(crate::forge::gitlab::config::Gitlab),
+    Gitlab(gitlab::Config),
 }
 
 pub trait ForgeConfigTrait {

@@ -2,7 +2,7 @@ use std::sync::{Arc, atomic::AtomicBool};
 
 use super::{Repo, RepoError};
 
-use git2::{FetchOptions, RemoteCallbacks, build::RepoBuilder};
+use git2::{FetchOptions, Oid, RemoteCallbacks, build::RepoBuilder};
 use tracing::debug;
 
 impl Repo {
@@ -21,7 +21,17 @@ impl Repo {
     }
 
     #[tracing::instrument(level = "debug", ret, err)]
-    pub fn fetch<'a>(&mut self) -> Result<bool, RepoError> {
+    pub fn checkout(&self, head: Oid) -> Result<(), RepoError> {
+        let repo = self.repo()?;
+        let head = repo.find_object(head, None)?;
+        debug!("object kind {:?}", head.kind());
+        repo.reset(&head, git2::ResetType::Hard, None)?;
+
+        Ok(())
+    }
+
+    #[tracing::instrument(level = "debug", ret, err)]
+    pub fn fetch(&mut self) -> Result<bool, RepoError> {
         let mut remote = self.default_remote()?;
         let (mut fo, updated) = self.fetch_options();
         remote.fetch(&[&self.default_branch], Some(&mut fo), Some("gtree fetch"))?;

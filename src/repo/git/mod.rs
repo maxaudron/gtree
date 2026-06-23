@@ -4,8 +4,7 @@ use anyhow::Context;
 use git2::{Direction, Reference, Remote, RepositoryState};
 use tracing::{debug, instrument};
 
-mod checkout;
-mod fetch;
+mod actions;
 
 impl Repo {
     #[instrument(level = "debug", ret)]

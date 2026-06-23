@@ -2,7 +2,8 @@ use anyhow::Result;
 
 use graphql_client::GraphQLQuery;
 
-pub mod config;
+mod config;
+pub use config::*;
 
 #[derive(Clone, Debug)]
 pub struct Gitlab {
@@ -24,7 +25,7 @@ impl Gitlab {
     }
 
     #[tracing::instrument(level = "trace")]
-    pub async fn from_config(forge: &config::Gitlab) -> Result<Gitlab> {
+    pub async fn from_config(forge: &config::Config) -> Result<Gitlab> {
         Gitlab::new(&forge.host, &forge.token, forge.tls).await
     }
 }
