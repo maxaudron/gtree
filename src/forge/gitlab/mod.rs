@@ -82,8 +82,8 @@ impl super::ForgeTrait for Gitlab {
 
 #[derive(GraphQLQuery)]
 #[graphql(
-    query_path = "graphql/projects_query.graphql",
-    schema_path = "graphql/schema.graphql",
+    query_path = "graphql/gitlab_projects_query.graphql",
+    schema_path = "graphql/gitlab_schema.graphql",
     response_derives = "Clone,Debug",
     variables_derives = "Clone,Debug"
 )]

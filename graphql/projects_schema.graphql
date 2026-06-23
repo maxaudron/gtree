@@ -1,9 +1,0 @@
-type Query {
-  projects(path: String!): [Project]
-}
-
-type Project {
-  id: String
-  name: String
-  fullPath: String
-}
