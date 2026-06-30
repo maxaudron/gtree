@@ -6,6 +6,15 @@ use serde::{Deserialize, Serialize};
 use crate::config::ForgeConfig;
 
 pub mod gitlab;
+pub mod github;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ForgeType {
+    Gitlab,
+    Github,
+    Forgejo,
+    SSH,
+}
 
 #[derive(Clone, Debug)]
 pub enum Forge {

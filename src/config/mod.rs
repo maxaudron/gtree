@@ -1,4 +1,5 @@
 pub mod args;
+pub mod url;
 
 use serde::{Deserialize, Serialize};
 
@@ -12,27 +13,22 @@ use figment::{
 
 use anyhow::{Context, Result};
 
-use crate::forge::gitlab;
+use crate::forge::{ForgeType, github, gitlab};
 
 /// Configuration for the Bot
 #[derive(Clone, Debug, Deserialize, Serialize)]
-// pub struct Config();
-
-// TODO make forge optional
 pub struct Config {
-    #[serde(flatten)]
-    config: BTreeMap<String, ForgeConfig>,
+    pub forge: BTreeMap<String, ForgeConfig>,
+    pub alias: BTreeMap<String, String>,
+    pub settings: Settings,
 }
 
-impl Deref for Config {
-    type Target = BTreeMap<String, ForgeConfig>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.config
-    }
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Settings {
+    pub default_forge: Option<String>,
 }
 
-impl Config {
+impl<'a> Config {
     // Allow the configuration to be extracted from any `Provider`.
     #[allow(clippy::result_large_err)]
     pub fn from<T: Provider>(provider: T) -> Result<Config, Error> {
@@ -55,6 +51,18 @@ impl Config {
         ))
         .merge(Env::prefixed("GTREE_")))
     }
+
+    /// Resolve a shorthand, name or domain to the
+    /// key of the forge in our config
+    pub fn resolve_forge(&'a self, forge: &'a str) -> Option<&'a str> {
+        if self.forge.contains_key(forge) {
+            Some(forge)
+        } else if let Some(forge) = self.alias.get(forge) {
+            Some(forge.as_str())
+        } else {
+            None
+        }
+    }
 }
 
 // Make `Config` a provider itself for composability.
@@ -73,6 +81,17 @@ impl Provider for Config {
 pub enum ForgeConfig {
     #[serde(alias = "gitlab")]
     Gitlab(gitlab::Config),
+    #[serde(alias = "github")]
+    Github(github::Config),
+}
+
+impl From<&ForgeConfig> for ForgeType {
+    fn from(val: &ForgeConfig) -> Self {
+        match val {
+            ForgeConfig::Gitlab(_) => ForgeType::Gitlab,
+            ForgeConfig::Github(_) => ForgeType::Github,
+        }
+    }
 }
 
 pub trait ForgeConfigTrait {
@@ -86,6 +105,7 @@ impl Deref for ForgeConfig {
     fn deref(&self) -> &Self::Target {
         match self {
             ForgeConfig::Gitlab(conf) => conf,
+            ForgeConfig::Github(conf) => conf,
         }
     }
 }

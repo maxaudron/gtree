@@ -13,8 +13,8 @@ pub mod config;
 pub mod forge;
 pub mod repo;
 
-mod cmd;
 mod batch;
+mod cmd;
 
 #[cfg(test)]
 mod tests;
@@ -42,6 +42,7 @@ impl GTree {
         let config: config::Config = figment.extract()?;
 
         let (_name, forge_config) = config
+            .forge
             .iter()
             .next()
             .context("No Forge configured, please setup a forge")?;
@@ -62,27 +63,34 @@ impl GTree {
     }
 
     // #[tracing::instrument(level = "trace")]
-    pub fn run(self) -> Result<()> {
-        let scope = Arc::new(self.args.scope.as_ref().map_or("", |x| x).to_string());
+    pub fn run(mut self) -> Result<()> {
+        let scope = self
+            .args
+            .scope
+            .as_mut()
+            .ok_or(anyhow::anyhow!("no scope provided"))?;
+        let scope = Arc::new(self.config.make_git_url(scope)?);
 
         // TODO select a specific forge
         let forge = Arc::new(
             self.config
-                .iter()
-                .next()
+                .forge
+                .get(&scope.domain)
                 .context("No Forge configured, please setup a forge")?
-                .1
                 .clone(),
         );
 
-        let scope_t = scope.clone();
+        let scope_path = scope.full_path()?;
         let forge_t = forge.clone();
-        let handle = thread::spawn(move || Repos::from_local(forge_t.root(), &scope_t));
+        let handle = thread::spawn(move || {
+            Repos::from_local(forge_t.root(), &scope_path)
+        });
 
+        let scope_path = scope.full_path()?;
         let projects = RUNTIME
             .get()
             .unwrap()
-            .block_on(self.forge.projects(&scope))?;
+            .block_on(self.forge.projects(&scope_path))?;
         let remote = Repos::from_forge(forge.root(), projects);
 
         let local = handle.join().unwrap();

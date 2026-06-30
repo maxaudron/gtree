@@ -11,6 +11,7 @@ repository = "https://gitlab.com/cocainefarm/gtree"
 [dependencies]
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
 futures = "0.3"
+nom = "8"
 
 itertools = "0.15"
 num_cpus = "1"
