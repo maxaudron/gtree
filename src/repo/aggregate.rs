@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::RwLock};
+use std::{collections::HashMap, path::Path, sync::RwLock};
 
 use tracing::{debug, error};
 use walkdir::WalkDir;
@@ -9,18 +9,18 @@ use super::{Repo, Repos};
 
 #[async_trait::async_trait]
 pub trait Aggregator {
-    fn from_local(root: &str, scope: &str) -> Repos;
-    fn from_forge(root: &str, projects: Vec<Project>) -> Repos;
+    fn from_local(root: &Path, scope: &str) -> Repos;
+    fn from_forge(root: &Path, projects: Vec<Project>) -> Repos;
     fn aggregate(local: Repos, remote: Repos, known_hosts: Vec<ssh_key::PublicKey>) -> Repos;
 }
 
 #[async_trait::async_trait]
 impl Aggregator for Repos {
     #[tracing::instrument(level = "trace", ret)]
-    fn from_local(root: &str, scope: &str) -> Repos {
+    fn from_local(root: &Path, scope: &str) -> Repos {
         let mut repos = HashMap::new();
 
-        let path: std::path::PathBuf = root.into();
+        let path: std::path::PathBuf = root.to_owned();
 
         if !path.exists() {
             return repos;
@@ -81,12 +81,12 @@ impl Aggregator for Repos {
     }
 
     #[tracing::instrument(level = "trace", ret)]
-    fn from_forge(root: &str, projects: Vec<Project>) -> Repos {
+    fn from_forge(root: &Path, projects: Vec<Project>) -> Repos {
         projects
             .iter()
             .map(|project| {
                 let mut repo: Repo = project.into();
-                repo.path = [root, &repo.name].iter().collect();
+                repo.path = root.join(&repo.name);
                 debug!("repo path: {:#?}", repo.path);
                 (repo.name.clone(), RwLock::new(repo))
             })

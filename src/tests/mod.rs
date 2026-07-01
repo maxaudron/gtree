@@ -30,12 +30,6 @@ fn build_path(path: &Path, repo: &str) -> PathBuf {
     path
 }
 
-fn build_path_string(path: &Path, repo: &str) -> String {
-    let mut path = path.to_owned();
-    path.push(repo);
-    path.into_os_string().into_string().unwrap()
-}
-
 #[tokio::test]
 async fn search_repos() -> Result<()> {
     tracing_subscriber::fmt::init();
@@ -52,7 +46,7 @@ async fn search_repos() -> Result<()> {
         "site/group/subgroup/repo3".to_owned(),
         "site/group/subgroup/subsubgroup/repo4".to_owned(),
     ];
-    let right = Repos::from_local(&build_path_string(test_path, "repos"), "");
+    let right = Repos::from_local(&test_path.join("repos"), "");
 
     let mut right: Vec<&str> = right.iter().map(|x| x.0.as_str()).collect();
 

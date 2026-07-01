@@ -3,7 +3,7 @@ pub mod url;
 
 use serde::{Deserialize, Serialize};
 
-use std::{collections::BTreeMap, ops::Deref};
+use std::{collections::BTreeMap, ops::Deref, path::Path};
 
 use figment::{
     Error, Figment, Metadata, Profile, Provider,
@@ -97,7 +97,7 @@ impl From<&ForgeConfig> for ForgeType {
 }
 
 pub trait ForgeConfigTrait {
-    fn root(&self) -> &str;
+    fn root(&self) -> &Path;
     fn known_hosts(&self) -> Vec<ssh_key::PublicKey>;
 }
 

@@ -62,15 +62,7 @@ impl GTree {
         })
     }
 
-    // #[tracing::instrument(level = "trace")]
-    pub fn run(mut self) -> Result<()> {
-        let scope = self
-            .args
-            .scope
-            .as_mut()
-            .ok_or(anyhow::anyhow!("no scope provided"))?;
-        let scope = Arc::new(self.config.make_git_url(scope)?);
-
+    fn get_repos(&self, scope: config::url::GitUrl) -> Result<Repos, anyhow::Error> {
         // TODO select a specific forge
         let forge = Arc::new(
             self.config
@@ -82,9 +74,7 @@ impl GTree {
 
         let scope_path = scope.full_path()?;
         let forge_t = forge.clone();
-        let handle = thread::spawn(move || {
-            Repos::from_local(forge_t.root(), &scope_path)
-        });
+        let handle = thread::spawn(move || Repos::from_local(forge_t.root(), &scope_path));
 
         let scope_path = scope.full_path()?;
         let projects = RUNTIME
@@ -94,12 +84,48 @@ impl GTree {
         let remote = Repos::from_forge(forge.root(), projects);
 
         let local = handle.join().unwrap();
-        let repos = Repos::aggregate(local, remote, forge.known_hosts());
+        Ok(Repos::aggregate(local, remote, forge.known_hosts()))
+    }
 
-        match self.args.command {
-            config::args::Commands::Sync => self.sync(repos),
-            config::args::Commands::Update => self.update(repos),
-            config::args::Commands::List => self.list(repos)?,
+    // #[tracing::instrument(level = "trace")]
+    pub fn run(self) -> Result<()> {
+        match &self.args.command {
+            config::args::Commands::Clone(args) => self
+                .git_clone(
+                    self.config.make_git_url(
+                        args.scope
+                            .as_deref()
+                            .ok_or(anyhow::anyhow!("no scope provided"))?,
+                    )?,
+                )
+                .unwrap(),
+            config::args::Commands::Sync(args) => self.sync(
+                self.get_repos(
+                    self.config.make_git_url(
+                        args.scope
+                            .as_deref()
+                            .ok_or(anyhow::anyhow!("no scope provided"))?,
+                    )?,
+                )?,
+            ),
+            config::args::Commands::Update(args) => self.update(
+                self.get_repos(
+                    self.config.make_git_url(
+                        args.scope
+                            .as_deref()
+                            .ok_or(anyhow::anyhow!("no scope provided"))?,
+                    )?,
+                )?,
+            ),
+            config::args::Commands::List(args) => self.list(
+                self.get_repos(
+                    self.config.make_git_url(
+                        args.scope
+                            .as_deref()
+                            .ok_or(anyhow::anyhow!("no scope provided"))?,
+                    )?,
+                )?,
+            )?,
         };
 
         Ok(())
