@@ -19,11 +19,13 @@ use crate::forge::{ForgeType, github, gitlab};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
     pub forge: BTreeMap<String, ForgeConfig>,
+    #[serde(default)]
     pub alias: BTreeMap<String, String>,
+    #[serde(default)]
     pub settings: Settings,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Settings {
     pub default_forge: Option<String>,
 }

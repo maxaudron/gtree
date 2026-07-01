@@ -13,7 +13,7 @@ use nom::{
     combinator::{opt, rest},
     sequence::terminated,
 };
-use tracing::instrument;
+use tracing::{debug, instrument};
 
 use crate::{config::Config, forge::ForgeType};
 
@@ -50,15 +50,13 @@ fn parse_user(input: &str) -> IResult<&str, Option<&str>> {
     opt(terminated(take_until1("@"), tag("@"))).parse(input)
 }
 
-fn parse_forge(input: &str) -> IResult<&str, &str> {
-    terminated(take_until1(":"), tag(":"))
-        .or(terminated(take_until1(":"), tag(":")))
-        .or(rest)
+fn parse_forge(input: &str) -> IResult<&str, Option<&str>> {
+    opt(terminated(take_until1(":"), tag(":")).or(terminated(take_until1(":"), tag(":"))))
         .parse(input)
 }
 
 fn parse_owner(input: &str) -> IResult<&str, Option<&str>> {
-    opt(terminated(take_until1("/"), tag("/"))).parse(input)
+    opt(terminated(take_until1("/"), tag("/")).or(rest)).parse(input)
 }
 
 impl Config {
@@ -68,6 +66,15 @@ impl Config {
         let (rest, user) = parse_user(rest)?;
         let (rest, forge) =
             parse_forge(rest).map_err(|_| GitUrlError::NoForgeFound(rest.to_string()))?;
+
+        debug!(
+            "parse_forge: {:?}, default_forge: {:?}",
+            forge, self.settings.default_forge
+        );
+
+        let forge = forge
+            .or(self.settings.default_forge.as_deref())
+            .ok_or(GitUrlError::NoForgeFound(rest.to_string()))?;
         let (rest, owner) = parse_owner(rest)?;
         let path = if !rest.is_empty() {
             Some(rest.trim_end_matches(".git"))
@@ -125,12 +132,32 @@ impl GitUrl {
 
         Ok(res)
     }
+
+    pub fn ssh_url(&self) -> Result<String, GitUrlError> {
+        Ok(format!(
+            "{}@{}:{}",
+            self.user.as_deref().unwrap_or("git"),
+            self.domain,
+            self.full_path()?
+        ))
+    }
+
+    pub fn https_url(&self) -> Result<String, GitUrlError> {
+        Ok(format!(
+            "https://{}{}/{}",
+            self.user.as_deref().unwrap_or(""),
+            self.domain,
+            self.full_path()?
+        ))
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use tracing_test::traced_test;
+
     use crate::{
-        config::{Config, url::GitUrl},
+        config::{Config, Settings, url::GitUrl},
         forge::ForgeType,
     };
 
@@ -153,7 +180,13 @@ mod tests {
         let mut alias = BTreeMap::new();
         alias.insert("github".to_string(), "github.com".to_string());
 
-        Config { forge, alias }
+        let settings = Settings::default();
+
+        Config {
+            forge,
+            alias,
+            settings,
+        }
     }
 
     fn git_url() -> GitUrl {
@@ -226,5 +259,34 @@ mod tests {
                 .unwrap(),
             git_url_user()
         )
+    }
+
+    #[test]
+    #[should_panic(expected = "NoForgeFound")]
+    pub fn parse_no_forge_panic() {
+        assert_eq!(config().make_git_url("maxaudron/gtree").unwrap(), git_url())
+    }
+
+    #[test]
+    #[traced_test]
+    pub fn parse_only_path() {
+        let mut config = config();
+        config.settings.default_forge = Some("github.com".to_string());
+        assert_eq!(config.make_git_url("maxaudron/gtree").unwrap(), git_url())
+    }
+
+    #[test]
+    #[traced_test]
+    pub fn parse_only_forge() {
+        assert_eq!(
+            config().make_git_url("github:").unwrap(),
+            GitUrl::from_parts(
+                ForgeType::Github,
+                "github.com".to_string(),
+                None,
+                None,
+                None
+            )
+        );
     }
 }

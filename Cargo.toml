@@ -36,6 +36,7 @@ serde = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-flame = "0.2"
+tracing-test = "0.2"
 
 # error handling
 anyhow = "1"
