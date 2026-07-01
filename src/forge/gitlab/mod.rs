@@ -1,9 +1,9 @@
-use anyhow::Result;
-
 use graphql_client::GraphQLQuery;
 
 mod config;
 pub use config::*;
+
+use crate::forge::ForgeError;
 
 #[derive(Clone, Debug)]
 pub struct Gitlab {
@@ -12,7 +12,7 @@ pub struct Gitlab {
 
 impl Gitlab {
     #[tracing::instrument(level = "trace")]
-    pub async fn new(host: &str, token: &str, tls: bool) -> Result<Gitlab> {
+    pub async fn new(host: &str, token: &str, tls: bool) -> Result<Gitlab, ForgeError> {
         let mut gitlab = gitlab::GitlabBuilder::new(host, token);
 
         if !tls {
@@ -25,7 +25,7 @@ impl Gitlab {
     }
 
     #[tracing::instrument(level = "trace")]
-    pub async fn from_config(forge: &config::Config) -> Result<Gitlab> {
+    pub async fn from_config(forge: &config::Config) -> Result<Gitlab, ForgeError> {
         Gitlab::new(&forge.host, &forge.token, forge.tls).await
     }
 }
@@ -33,7 +33,7 @@ impl Gitlab {
 #[async_trait::async_trait]
 impl super::ForgeTrait for Gitlab {
     #[tracing::instrument(level = "trace")]
-    async fn projects(&self, scope: &str) -> Result<Vec<super::Project>> {
+    async fn projects(&self, scope: &str) -> Result<Vec<super::Project>, ForgeError> {
         let query = Projects::build_query(projects::Variables {
             scope: scope.to_owned(),
             after: "".to_owned(),
@@ -46,10 +46,7 @@ impl super::ForgeTrait for Gitlab {
 
         let mut nodes = projects.nodes.unwrap().clone();
         if nodes.is_empty() {
-            return Err(anyhow::anyhow!(
-                "No projects found with search: {:?}",
-                scope
-            ));
+            return Ok(Vec::new());
         };
 
         let mut page = projects.page_info.end_cursor.unwrap();

@@ -11,9 +11,15 @@ use figment::{
     value::{Dict, Map},
 };
 
-use anyhow::{Context, Result};
-
 use crate::forge::{ForgeType, github, gitlab};
+
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    #[error("configuration failure: {0}")]
+    Figment(#[from] figment::Error),
+    #[error("failed to create config directory")]
+    IOError(#[from] std::io::Error),
+}
 
 /// Configuration for the Bot
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -33,25 +39,21 @@ pub struct Settings {
 impl<'a> Config {
     // Allow the configuration to be extracted from any `Provider`.
     #[allow(clippy::result_large_err)]
-    pub fn from<T: Provider>(provider: T) -> Result<Config, Error> {
-        Figment::from(provider).extract()
+    pub fn from<T: Provider>(provider: T) -> Result<Config, ConfigError> {
+        Ok(Figment::from(provider).extract()?)
     }
 
     // Provide a default provider, a `Figment`.
-    pub fn figment() -> Result<Figment> {
+    pub fn figment() -> Result<Figment, ConfigError> {
         use figment::providers::Env;
 
         let dirs = xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
 
-        Ok(Figment::from(Toml::file(
-            dirs.place_config_file("config.toml")
-                .context("failed to create config directory")?,
-        ))
-        .merge(Toml::file(
-            dirs.place_config_file("config.yaml")
-                .context("failed to create config directory")?,
-        ))
-        .merge(Env::prefixed("GTREE_")))
+        Ok(
+            Figment::from(Toml::file(dirs.place_config_file("config.toml")?))
+                .merge(Toml::file(dirs.place_config_file("config.yaml")?))
+                .merge(Env::prefixed("GTREE_")),
+        )
     }
 
     /// Resolve a shorthand, name or domain to the

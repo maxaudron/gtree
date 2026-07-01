@@ -1,12 +1,20 @@
 use std::ops::Deref;
 
-use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::config::ForgeConfig;
 
 pub mod gitlab;
 pub mod github;
+
+#[derive(Debug, thiserror::Error)]
+pub enum ForgeError {
+    #[error("unknown forge type found")]
+    UnknownForge,
+
+    #[error("gitlab error: {0}")]
+    Gitlab(#[from] ::gitlab::GitlabError),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ForgeType {
@@ -22,20 +30,20 @@ pub enum Forge {
 }
 
 impl Forge {
-    pub async fn new(config: &ForgeConfig) -> Result<Forge> {
+    pub async fn new(config: &ForgeConfig) -> Result<Forge, ForgeError> {
         match config {
             ForgeConfig::Gitlab(config) => {
                 Ok(Forge::Gitlab(gitlab::Gitlab::from_config(config).await?))
             }
             #[allow(unreachable_patterns)]
-            _ => bail!("wrong forge type found"),
+            _ => Err(ForgeError::UnknownForge)
         }
     }
 }
 
 #[async_trait::async_trait]
 pub trait ForgeTrait {
-    async fn projects(&self, scope: &str) -> Result<Vec<Project>>;
+    async fn projects(&self, scope: &str) -> Result<Vec<Project>, ForgeError>;
 }
 
 impl Deref for Forge {
