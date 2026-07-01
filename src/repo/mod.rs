@@ -24,7 +24,7 @@ pub struct Repo {
     pub default_branch: String,
 
     /// knowns hosts as sha256 hashes
-    known_hosts: Vec<[u8; 32]>,
+    pub known_hosts: Vec<[u8; 32]>,
 }
 
 impl Repo {

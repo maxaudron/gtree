@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::ForgeConfigTrait;
 
@@ -22,8 +22,8 @@ const fn default_tls() -> bool {
 }
 
 impl ForgeConfigTrait for Config {
-    fn root(&self) -> &str {
-        self.directory.to_str().unwrap()
+    fn root(&self) -> &Path {
+        &self.directory
     }
 
     fn known_hosts(&self) -> Vec<ssh_key::PublicKey> {
