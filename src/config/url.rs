@@ -50,9 +50,9 @@ fn parse_user(input: &str) -> IResult<&str, Option<&str>> {
     opt(terminated(take_until1("@"), tag("@"))).parse(input)
 }
 
-fn parse_forge(input: &str) -> IResult<&str, Option<&str>> {
-    opt(terminated(take_until1(":"), tag(":")).or(terminated(take_until1(":"), tag(":"))))
-        .parse(input)
+fn parse_forge(input: &str, http: bool) -> IResult<&str, Option<&str>> {
+    let sep = if http { "/" } else { ":" };
+    opt(terminated(take_until1(sep), tag(sep))).parse(input)
 }
 
 fn parse_owner(input: &str) -> IResult<&str, Option<&str>> {
@@ -62,10 +62,11 @@ fn parse_owner(input: &str) -> IResult<&str, Option<&str>> {
 impl Config {
     #[instrument(level = "debug", ret, err)]
     pub fn make_git_url(&self, mut url: &str) -> Result<GitUrl, GitUrlError> {
-        let (rest, _) = parse_scheme(url)?;
+        let (rest, schema) = parse_scheme(url)?;
         let (rest, user) = parse_user(rest)?;
+        let http = schema.map(|s| s.contains("http")).unwrap_or(false);
         let (rest, forge) =
-            parse_forge(rest).map_err(|_| GitUrlError::NoForgeFound(rest.to_string()))?;
+            parse_forge(rest, http).map_err(|_| GitUrlError::NoForgeFound(rest.to_string()))?;
 
         debug!(
             "parse_forge: {:?}, default_forge: {:?}",
@@ -75,7 +76,8 @@ impl Config {
         let forge = forge
             .or(self.settings.default_forge.as_deref())
             .ok_or(GitUrlError::NoForgeFound(rest.to_string()))?;
-        let (rest, owner) = parse_owner(rest)?;
+        let (rest, mut owner) = parse_owner(rest)?;
+        owner = owner.and_then(|s| if s.is_empty() { None } else { Some(s) });
         let path = if !rest.is_empty() {
             Some(rest.trim_end_matches(".git"))
         } else {
@@ -255,10 +257,10 @@ mod tests {
     pub fn parse_http() {
         assert_eq!(
             config()
-                .make_git_url("https://git@github.com:maxaudron/gtree.git")
+                .make_git_url("https://git@github.com/maxaudron/gtree.git")
                 .unwrap(),
             git_url_user()
-        )
+        );
     }
 
     #[test]
