@@ -61,8 +61,6 @@ pub enum RepoError {
     NoFF,
     #[error("git error: {0}")]
     Git(#[from] git2::Error),
-    #[error("error: {0}")]
-    Anyhow(#[from] anyhow::Error),
     #[error("unknown repo error")]
     Unknown,
 }

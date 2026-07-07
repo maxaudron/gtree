@@ -39,7 +39,6 @@ tracing-flame = "0.2"
 tracing-test = "0.2"
 
 # error handling
-anyhow = "1"
 thiserror = "2"
 
 derivative = "2"
@@ -52,6 +51,7 @@ ansi_term = "0.12"
 
 [dev-dependencies]
 tempfile = "3"
+anyhow = "1"
 
 [features]
 default = []
