@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::ForgeConfig;
 
-pub mod gitlab;
 pub mod github;
+pub mod gitlab;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ForgeError {
@@ -36,7 +36,7 @@ impl Forge {
                 Ok(Forge::Gitlab(gitlab::Gitlab::from_config(config).await?))
             }
             #[allow(unreachable_patterns)]
-            _ => Err(ForgeError::UnknownForge)
+            _ => Err(ForgeError::UnknownForge),
         }
     }
 }

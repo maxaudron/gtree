@@ -9,7 +9,10 @@ use tracing::{Level, debug, metadata::LevelFilter};
 use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan, prelude::*};
 
 use crate::{
-    config::{ConfigError, url::{GitUrl, GitUrlError}},
+    config::{
+        ConfigError,
+        url::{GitUrl, GitUrlError},
+    },
     forge::{Forge, ForgeError, Project},
     repo::{Aggregator, RepoError, Repos},
 };
@@ -48,7 +51,7 @@ enum GTreeError {
     #[error("no scope was provided on the command line, don't know what to do")]
     NoScope,
     #[error("no projects were found in the forge with the scope {0:?}")]
-    NoProjects(GitUrl)
+    NoProjects(GitUrl),
 }
 
 #[derive(Debug, Clone)]
@@ -97,7 +100,7 @@ impl GTree {
         })?;
 
         if projects.is_empty() {
-            return Err(GTreeError::NoProjects(scope))
+            return Err(GTreeError::NoProjects(scope));
         }
 
         let remote = Repos::from_forge(forge_config.root(), projects);
