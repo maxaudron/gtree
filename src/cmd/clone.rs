@@ -1,9 +1,7 @@
-use anyhow::Result;
-
-use crate::{config::url::GitUrl, repo::Repo};
+use crate::{GTreeError, config::url::GitUrl, repo::Repo};
 
 impl crate::GTree {
-    pub fn git_clone(&self, url: GitUrl) -> Result<()> {
+    pub fn git_clone(&self, url: GitUrl) -> Result<(), GTreeError> {
         let forge = self.config.forge.get(&url.domain).unwrap();
 
         let mut repo = Repo {

@@ -1,6 +1,5 @@
 use super::{LocalRepoState, Repo, RepoError};
 
-use anyhow::Context;
 use git2::{Direction, Reference, Remote, RepositoryState};
 use tracing::{debug, instrument};
 
@@ -77,7 +76,7 @@ impl Repo {
 
         let origin_ref = repo
             .find_reference(&format!("refs/remotes/{}/HEAD", remote_name))
-            .context("the remotes HEAD references does not exist")?;
+            .map_err(|_| RepoError::NoHead)?;
 
         debug!("got ref to origin: {:?}", origin_ref.shorthand()?);
 
