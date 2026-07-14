@@ -3,7 +3,7 @@ name = "gtree"
 description = "A tool to clone and pull whole group trees from a git forge, properly organized on disk."
 version = "1.1.0"
 edition = "2024"
-authors = ["Max Audron <audron@cocaine.farm>"]
+authors = ["Max Audron <me@audron.dev>"]
 license = "ISC"
 homepage = "https://gitlab.com/cocainefarm/gtree"
 repository = "https://gitlab.com/cocainefarm/gtree"
@@ -35,13 +35,9 @@ serde = "1"
 # logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing-flame = "0.2"
-tracing-test = "0.2"
 
 # error handling
 thiserror = "2"
-
-derivative = "2"
 
 url = { version = "2", features = ["serde"] }
 xdg = "3"
@@ -52,6 +48,9 @@ ansi_term = "0.12"
 [dev-dependencies]
 tempfile = "3"
 anyhow = "1"
+
+tracing-flame = "0.2"
+tracing-test = "0.2"
 
 [features]
 default = []
