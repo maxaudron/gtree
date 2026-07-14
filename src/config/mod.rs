@@ -1,9 +1,13 @@
 pub mod args;
 pub mod url;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
-use std::{collections::BTreeMap, ops::Deref, path::Path};
+use std::{
+    collections::BTreeMap,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 
 use figment::{
     Error, Figment, Metadata, Profile, Provider,
@@ -101,6 +105,21 @@ impl From<&ForgeConfig> for ForgeType {
 pub trait ForgeConfigTrait {
     fn root(&self) -> &Path;
     fn known_hosts(&self) -> Vec<ssh_key::PublicKey>;
+
+    fn deserialize_dir<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
+    where
+        D: Deserializer<'de>,
+        Self: Sized,
+    {
+        let dir = PathBuf::deserialize(deserializer)?;
+
+        Ok(if dir.is_absolute() {
+            dir
+        } else {
+            let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
+            home.join(dir)
+        })
+    }
 }
 
 impl Deref for ForgeConfig {

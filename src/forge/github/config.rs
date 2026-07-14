@@ -8,6 +8,7 @@ pub struct Config {
     #[serde(default = "default_host")]
     pub host: String,
     pub token: String,
+    #[serde(deserialize_with = "Config::deserialize_dir")]
     pub directory: PathBuf,
     #[serde(default = "default_tls")]
     pub tls: bool,
