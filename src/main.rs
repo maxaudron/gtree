@@ -89,11 +89,11 @@ impl GTree {
                 .clone(),
         );
 
-        let scope_path = scope.full_path()?;
+        let scope_path = scope.full_path().unwrap_or_default();
         let forge_t = forge_config.clone();
         let handle = thread::spawn(move || Repos::from_local(forge_t.root(), &scope_path));
 
-        let scope_path = scope.full_path()?;
+        let scope_path = scope.full_path().unwrap_or_default();
         let projects = RUNTIME.get().unwrap().block_on(async {
             let forge = Forge::new(&forge_config).await?;
             Ok::<Vec<Project>, GTreeError>(forge.projects(&scope_path).await?)

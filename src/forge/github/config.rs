@@ -5,6 +5,7 @@ use crate::config::ForgeConfigTrait;
 
 #[derive(Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Deserialize, Serialize)]
 pub struct Config {
+    #[serde(default = "default_host")]
     pub host: String,
     pub token: String,
     pub directory: PathBuf,
@@ -15,6 +16,10 @@ pub struct Config {
 
     #[serde(default)]
     pub known_hosts: Vec<ssh_key::PublicKey>,
+}
+
+fn default_host() -> String {
+    String::from("api.github.com")
 }
 
 const fn default_tls() -> bool {

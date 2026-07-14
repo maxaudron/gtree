@@ -96,6 +96,7 @@ impl From<projects::ProjectsProjectsNodes> for super::Project {
             path: project.full_path,
             ssh_clone_url: project.ssh_url_to_repo,
             http_clone_url: project.http_url_to_repo,
+            default_branch: project.repository.map(|r| r.root_ref.unwrap()),
         }
     }
 }

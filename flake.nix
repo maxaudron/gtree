@@ -82,7 +82,7 @@
             checks = self.checks;
 
             inputsFrom = [ gtree ];
-            packages = [ toolchain.rust-analyzer ];
+            packages = [ toolchain.rust-analyzer pkgs.graphql-client ];
           };
 
           packages = {
