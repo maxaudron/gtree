@@ -1,0 +1,10 @@
+#### GQL_GET_PROJECTS
+
+GRAPHQL https://gitlab.com/api/graphql HTTP/1.1
+Accept: application/json
+
+< ./gitlab_projects_query.graphql
+
+{
+  "scope": "de-sandbox/",
+}

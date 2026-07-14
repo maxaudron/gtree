@@ -1,0 +1,22 @@
+query Projects($after: String) {
+  viewer {
+    repositories(
+      first: 100,
+      after: $after,
+      orderBy: {field:NAME, direction:ASC},
+      ownerAffiliations: [OWNER, ORGANIZATION_MEMBER, COLLABORATOR]
+    ) {
+      nodes {
+        id
+        name
+        nameWithOwner
+        defaultBranchRef { name }
+        isDisabled
+        isEmpty
+        sshUrl
+        url
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}

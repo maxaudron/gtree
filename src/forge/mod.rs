@@ -7,6 +7,8 @@ use crate::config::ForgeConfig;
 pub mod github;
 pub mod gitlab;
 
+static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
 #[derive(Debug, thiserror::Error)]
 pub enum ForgeError {
     #[error("unknown forge type found")]
@@ -14,6 +16,14 @@ pub enum ForgeError {
 
     #[error("gitlab error: {0}")]
     Gitlab(#[from] ::gitlab::GitlabError),
+
+    #[error("request error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("failed to parse url: {0}")]
+    Url(#[from] url::ParseError),
+
+    #[error("internal error")]
+    InternalError,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -27,6 +37,7 @@ pub enum ForgeType {
 #[derive(Clone, Debug)]
 pub enum Forge {
     Gitlab(self::gitlab::Gitlab),
+    Github(self::github::Github),
 }
 
 impl Forge {
@@ -34,6 +45,9 @@ impl Forge {
         match config {
             ForgeConfig::Gitlab(config) => {
                 Ok(Forge::Gitlab(gitlab::Gitlab::from_config(config).await?))
+            }
+            ForgeConfig::Github(config) => {
+                Ok(Forge::Github(github::Github::from_config(config).await?))
             }
             #[allow(unreachable_patterns)]
             _ => Err(ForgeError::UnknownForge),
@@ -52,6 +66,7 @@ impl Deref for Forge {
     fn deref(&self) -> &Self::Target {
         match self {
             Forge::Gitlab(forge) => forge,
+            Forge::Github(forge) => forge,
         }
     }
 }
@@ -63,4 +78,5 @@ pub struct Project {
     pub path: String,
     pub ssh_clone_url: Option<String>,
     pub http_clone_url: Option<String>,
+    pub default_branch: Option<String>,
 }
