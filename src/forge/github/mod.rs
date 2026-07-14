@@ -2,10 +2,12 @@ use graphql_client::GraphQLQuery;
 
 mod config;
 pub use config::*;
-use reqwest::header;
 use serde::Deserialize;
+use tracing::instrument;
 
 use crate::forge::ForgeError;
+
+use super::ForgeTrait;
 
 #[derive(Clone, Debug)]
 pub struct Github {
@@ -16,17 +18,7 @@ pub struct Github {
 impl Github {
     #[tracing::instrument(level = "trace")]
     pub async fn new(host: &str, token: &str, tls: bool) -> Result<Github, ForgeError> {
-        let mut headers = header::HeaderMap::new();
-        let auth = format!("Bearer {token}");
-        let mut auth_value = header::HeaderValue::from_str(&auth).unwrap();
-        auth_value.set_sensitive(true);
-        headers.insert(header::AUTHORIZATION, auth_value);
-
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .user_agent(super::USER_AGENT)
-            .build()?;
-        let base_url = reqwest::Url::parse(&format!("https://{host}"))?;
+        let (client, base_url) = Self::new_client(host, token, tls)?;
 
         Ok(Github { client, base_url })
     }
@@ -38,6 +30,7 @@ impl Github {
 }
 
 impl Github {
+    #[instrument(level = "debug", ret, err)]
     async fn graphql(
         &self,
         scope: &str,
@@ -60,7 +53,7 @@ impl Github {
 }
 
 #[async_trait::async_trait]
-impl super::ForgeTrait for Github {
+impl ForgeTrait for Github {
     #[tracing::instrument(level = "trace")]
     async fn projects(&self, scope: &str) -> Result<Vec<super::Project>, ForgeError> {
         let response = self.graphql(scope, None).await?;
