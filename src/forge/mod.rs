@@ -14,9 +14,6 @@ pub enum ForgeError {
     #[error("unknown forge type found")]
     UnknownForge,
 
-    #[error("gitlab error: {0}")]
-    Gitlab(#[from] ::gitlab::GitlabError),
-
     #[error("request error: {0}")]
     Reqwest(#[from] reqwest::Error),
     #[error("failed to parse url: {0}")]
@@ -58,6 +55,31 @@ impl Forge {
 #[async_trait::async_trait]
 pub trait ForgeTrait {
     async fn projects(&self, scope: &str) -> Result<Vec<Project>, ForgeError>;
+
+    fn new_client(
+        host: &str,
+        token: &str,
+        tls: bool,
+    ) -> Result<(reqwest::Client, reqwest::Url), ForgeError>
+    where
+        Self: Sized,
+    {
+        let mut headers = reqwest::header::HeaderMap::new();
+        let auth = format!("Bearer {token}");
+        let mut auth_value = reqwest::header::HeaderValue::from_str(&auth).unwrap();
+        auth_value.set_sensitive(true);
+        headers.insert(reqwest::header::AUTHORIZATION, auth_value);
+
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .user_agent(USER_AGENT)
+            .build()?;
+
+        let schema = if tls { "https" } else { "http" };
+        let base_url = reqwest::Url::parse(&format!("{schema}://{host}"))?;
+
+        Ok((client, base_url))
+    }
 }
 
 impl Deref for Forge {
