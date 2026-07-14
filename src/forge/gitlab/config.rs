@@ -7,6 +7,7 @@ use crate::config::ForgeConfigTrait;
 pub struct Config {
     pub host: String,
     pub token: String,
+    #[serde(deserialize_with = "Config::deserialize_dir")]
     pub directory: PathBuf,
     #[serde(default = "default_tls")]
     pub tls: bool,
