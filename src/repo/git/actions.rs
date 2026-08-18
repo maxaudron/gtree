@@ -17,6 +17,15 @@ impl Repo {
             builder.clone(url, &self.path)?
         });
 
+        if let Some(user) = self.user.as_ref()
+            && let Some(repo) = self.repo.as_ref()
+        {
+            let mut config = repo.config()?.open_level(git2::ConfigLevel::Local)?;
+
+            config.set_str("user.name", &user.name)?;
+            config.set_str("user.email", &user.email)?;
+        }
+
         Ok(())
     }
 

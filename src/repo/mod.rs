@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use git2::{Repository, RepositoryState};
 
-use crate::forge::Project;
+use crate::{config::UserConfig, forge::Project};
 
 mod aggregate;
 mod git;
@@ -25,6 +25,7 @@ pub struct Repo {
 
     /// knowns hosts as sha256 hashes
     pub known_hosts: Vec<[u8; 32]>,
+    pub user: Option<UserConfig>,
 }
 
 impl Repo {
@@ -146,6 +147,7 @@ impl Default for Repo {
             forge: Default::default(),
             default_branch: "main".to_string(),
             known_hosts: Default::default(),
+            user: Default::default(),
         }
     }
 }

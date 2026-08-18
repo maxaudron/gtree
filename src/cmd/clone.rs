@@ -12,6 +12,7 @@ impl crate::GTree {
                 .iter()
                 .map(|k| k.fingerprint(ssh_key::HashAlg::Sha256).sha256().unwrap())
                 .collect(),
+            user: Some(forge.user().clone()),
             ..Default::default()
         };
 

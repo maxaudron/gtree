@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-use crate::config::ForgeConfigTrait;
+use crate::config::{ForgeConfigTrait, GenericForgeConfig};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -14,8 +14,8 @@ pub struct Config {
     #[serde(default)]
     pub auto_create_branches: bool,
 
-    #[serde(default)]
-    pub known_hosts: Vec<ssh_key::PublicKey>,
+    #[serde(flatten)]
+    pub generic: GenericForgeConfig,
 }
 
 const fn default_tls() -> bool {
@@ -27,7 +27,7 @@ impl ForgeConfigTrait for Config {
         &self.directory
     }
 
-    fn known_hosts(&self) -> Vec<ssh_key::PublicKey> {
-        self.known_hosts.clone()
+    fn generic(&self) -> &GenericForgeConfig {
+        &self.generic
     }
 }

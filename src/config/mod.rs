@@ -35,6 +35,19 @@ pub struct Config {
     pub settings: Settings,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Deserialize, Serialize)]
+pub struct GenericForgeConfig {
+    #[serde(default)]
+    pub known_hosts: Vec<ssh_key::PublicKey>,
+    pub user: UserConfig,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Deserialize, Serialize)]
+pub struct UserConfig {
+    pub name: String,
+    pub email: String,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Settings {
     pub default_forge: Option<String>,
@@ -104,7 +117,15 @@ impl From<&ForgeConfig> for ForgeType {
 
 pub trait ForgeConfigTrait {
     fn root(&self) -> &Path;
-    fn known_hosts(&self) -> Vec<ssh_key::PublicKey>;
+    fn generic(&self) -> &GenericForgeConfig;
+
+    fn known_hosts(&self) -> Vec<ssh_key::PublicKey> {
+        self.generic().known_hosts.clone()
+    }
+
+    fn user(&self) -> &UserConfig {
+        &self.generic().user
+    }
 
     fn deserialize_dir<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
     where
