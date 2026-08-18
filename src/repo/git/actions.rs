@@ -17,6 +17,12 @@ impl Repo {
             builder.clone(url, &self.path)?
         });
 
+        self.write_user()?;
+
+        Ok(())
+    }
+
+    pub fn write_user(&self) -> Result<(), RepoError> {
         if let Some(user) = self.user.as_ref()
             && let Some(repo) = self.repo.as_ref()
         {
