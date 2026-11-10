@@ -1,0 +1,212 @@
+= gtree(5)
+Max Audron
+v1.1.0
+:doctype: manpage
+:manmanual: GTREE
+:mansource: GTREE
+
+== Name
+
+config.toml - configuration file for gtree
+
+== Synopsis
+
+_$XDG_CONFIG_HOME/gtree/config.toml_
+
+_$HOME/.config/gtree/config.toml_
+
+== Description
+
+The *config.toml* file configures the Git forges known to *gtree*(1), their
+local repository directories, API access, SSH host verification, aliases, and
+the default forge used to resolve unqualified scopes.
+
+The file uses TOML syntax.  Configuration is loaded from the *gtree*
+subdirectory of the platform's XDG configuration home.  On a typical Unix
+system this is `$XDG_CONFIG_HOME/gtree`, or `$HOME/.config/gtree` when
+`XDG_CONFIG_HOME` is unset.
+
+The top-level `forge` table is required and must contain at least the forge
+entries needed by commands.  The `alias` and `settings` tables are optional.
+
+== File Precedence
+
+Configuration sources are merged in this order, with later sources taking
+precedence:
+
+. `config.toml`
+. Environment variables beginning with `GTREE_`
+
+
+== Forge Tables
+
+Each forge is declared as `[forge."NAME"]`, where _NAME_ is the identifier
+used in command scopes.  Domain names are recommended because full Git URLs
+are resolved by matching their host to this key.
+
+For example, the scope `gitlab.com:example/platform` selects the table
+`[forge."gitlab.com"]`.
+
+The following keys are supported in every forge table:
+
+*type* = _STRING_::
+  Required.  Select the forge implementation.  Supported values are `gitlab`
+  and `github`.  The capitalized enum names `Gitlab` and `Github` are also
+  accepted.
+
+*host* = _STRING_::
+  API host name without a URL scheme.  Gitlab defaults to `gitlab.com` and
+  GitHub defaults to `api.github.com`.
+
+*token* = _STRING_::
+  Required.  API bearer token used to query the forge.  The token must grant
+  enough read access to enumerate repositories in the requested scope.  Keep
+  this file private because the token is stored as plain text.
+
+*directory* = _STRING_::
+  Required.  Root directory below which repositories from this forge are
+  stored.  Absolute paths are used directly.  Relative paths are resolved
+  against `$HOME`.
+
+*tls* = _BOOLEAN_::
+  Use HTTPS for forge API requests when `true`, or HTTP when `false`.  The
+  default is `true`.  This does not change the SSH URLs used for cloning.
+
+*known_hosts* = [_SSH_PUBLIC_KEY_, ...]::
+  Optional list of SSH public keys trusted for this forge.  Each value is an
+  OpenSSH public key string, such as an `ssh-ed25519` host key.  During SSH
+  cloning and fetching, *gtree* explicitly accepts keys whose SHA-256
+  fingerprint matches this list.  Missing or nonmatching keys are passed back
+  to libgit2's normal certificate handling.
+
+== User Tables
+
+Each forge accepts a nested `[forge."NAME".user]` table.  This identity is
+written to the local Git configuration of repositories cloned by *gtree*.
+
+*name* = _STRING_::
+  Required.  Value written as `user.name` in the repository's Git
+  configuration.
+
+*email* = _STRING_::
+  Required.  Value written as `user.email` in the repository's Git
+  configuration.
+
+== Aliases
+
+The optional `[alias]` table maps short forge names to keys in the `forge`
+table.  Each key is an alias and each value is the complete forge key.
+
+For example:
+
+....
+[alias]
+gl = "gitlab.com"
+gh = "github.com"
+....
+
+With this configuration, `gl:example/platform` resolves to the
+`[forge."gitlab.com"]` entry.
+
+Aliases are used only when no forge table exists under the same name.  A forge
+key therefore takes precedence over an alias with an identical name.
+
+== Settings
+
+The optional `[settings]` table controls global behavior.
+
+*default_forge* = _STRING_::
+  Forge key or alias used when a command scope does not include a forge name.
+  For example, with `default_forge = "github.com"`, the scope
+  `example/project` is resolved against `[forge."github.com"]`.  If this key
+  is omitted, scopes must identify a forge.
+
+== Example
+
+The following example configures GitLab and GitHub, defines short aliases, and
+uses GitLab as the default forge:
+
+....
+[forge."gitlab.com"]
+type = "gitlab"
+host = "gitlab.com"
+token = "replace-with-gitlab-token"
+directory = "repo/gitlab.com"
+tls = true
+known_hosts = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC+5bAaN9e+OwAWypfxaLyaeO+wmUI5J2OvR4oze5oJs",
+]
+
+[forge."gitlab.com".user]
+name = "Example User"
+email = "user@example.com"
+
+[forge."github.com"]
+type = "github"
+host = "api.github.com"
+token = "replace-with-github-token"
+directory = "/srv/git/github.com"
+
+[alias]
+gl = "gitlab.com"
+gh = "github.com"
+
+[settings]
+default_forge = "gitlab.com"
+....
+
+The relative GitLab directory above resolves to `$HOME/repo/gitlab.com`; the
+GitHub directory remains `/srv/git/github.com` because it is absolute.
+
+== Environment Overrides
+
+Environment variables with the `GTREE_` prefix are interpreted by Figment and
+merged into the configuration.  They can override file-based values and have
+the highest precedence.  Nested keys follow Figment's environment-provider
+naming rules.
+
+Because forge keys commonly contain dots, file-based configuration is the
+least ambiguous way to declare forge tables.  Environment variables are most
+useful for simple scalar overrides and secrets in controlled deployments.
+
+== Security
+
+API tokens in *config.toml* are stored unencrypted.  Restrict the file's
+permissions to its owner, for example with `chmod 600 config.toml`.
+
+Configure `known_hosts` when SSH host authentication is required.  Omitting
+the list causes *gtree* to defer host-key handling entirely to libgit2 rather
+than explicitly accepting a configured fingerprint.
+
+== Files
+
+_$XDG_CONFIG_HOME/gtree/config.toml_::
+  Primary configuration file when `XDG_CONFIG_HOME` is set.
+
+_$HOME/.config/gtree/config.toml_::
+  Typical primary configuration path when `XDG_CONFIG_HOME` is unset.
+
+_$XDG_CONFIG_HOME/gtree/config.yaml_::
+  Secondary configuration path.  It currently expects TOML syntax and
+  overrides the primary file.
+
+== See Also
+
+*gtree*(1), *git-config*(1), *ssh-keygen*(1)
+
+== Resources
+
+*Project repositories:*
+
+* https://git.vapor.systems/gtree
+* https://codeberg.org/maxaudron/gtree
+* https://github.com/maxaudron/gtree
+* https://gitlab.com/cocainefarm/gtree
+
+== Authors
+
+*gtree* was written by Max Audron <me@audron.dev>.
+
+== Copying
+
+*gtree* is distributed under the terms of the ISC License.

@@ -1,0 +1,38 @@
+= gtree
+
+image:https://img.shields.io/badge/git-repo-cba6f7?logo=git[link=https://git.vapor.systems/gtree.git]
+image:https://img.shields.io/badge/github-repo-blue?logo=github[link=https://github.com/maxaudron/gtree]
+image:https://img.shields.io/badge/gitlab-repo-orange?logo=gitlab[link=https://gitlab.com/audron/gtree]
+image:https://img.shields.io/badge/codeberg-repo-violet?logo=codeberg[link=https://codeberg.org/maxaudron/gtree]
+
+`gtree` is a command-line tool for maintaining local trees of repositories
+from Git forges. It discovers repositories in a forge scope, preserves the
+remote group or organization hierarchy on disk, and performs repository
+operations concurrently.
+
+The project currently supports GitLab and GitHub. It is useful when a whole
+namespace should be available locally without cloning and updating every
+repository by hand.
+
+== Features
+
+* Clone whole repository trees from GitLab and GitHub.
+* Preserve the forge's group hierarchy in the local directory layout.
+* Update clean repositories in place, leaving dirty ones untouched.
+* Concurrent operation and fast GraphQL API access
+* Multiple forges with short aliases and an optional default forge.
+
+== Examples
+
+[source,shell]
+----
+gtree sync gitlab:example/platform
+gtree update --jobs 4 github:example
+gtree list example/platform
+gtree clone git@github.com:maxaudron/gtree.git
+----
+
+== Documentation
+
+* link:docs/cli.adoc[CLI reference]
+* link:docs/config.adoc[Configuration reference]

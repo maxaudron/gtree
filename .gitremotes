@@ -1,6 +1,9 @@
 [remote "origin"]
   url = git@vapor.systems:gtree.git
   fetch = +refs/heads/*:refs/remotes/origin/*
+[remote "codeberg"]
+  url = git@codeberg.org:maxaudron/gtree.git
+  fetch = +refs/heads/*:refs/remotes/origin/*
 [remote "github"]
   url = git@github.com:maxaudron/gtree.git
   fetch = +refs/heads/*:refs/remotes/origin/*

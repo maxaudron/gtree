@@ -1,0 +1,179 @@
+= gtree(1)
+Max Audron
+v1.1.0
+:doctype: manpage
+:manmanual: GTREE
+:mansource: GTREE
+
+== Name
+
+gtree - manage trees of repositories from git forges
+
+== Synopsis
+
+*gtree* [_OPTION_]... *sync* _SCOPE_
+
+*gtree* [_OPTION_]... *update* _SCOPE_
+
+*gtree* [_OPTION_]... *list* _SCOPE_
+
+*gtree* [_OPTION_]... *clone* _REPOSITORY_
+
+*gtree* *help* [_COMMAND_]
+
+== Description
+
+*gtree* discovers repositories below a scope on a configured Git forge and
+maps the forge's group or organization hierarchy into a local directory tree.
+It currently supports GitLab and GitHub.
+
+The forge is selected from _SCOPE_.  A scope may name a configured forge or
+alias followed by a colon, such as `github.com:owner/project` or
+`github:owner/project`. Or use a full SSH or HTTPS Git URL as an alternative.
+If `settings.default_forge` is configured, the forge prefix may be omitted.
+
+== Commands
+
+*sync* _SCOPE_::
+  Compare repositories below _SCOPE_ with the local tree.  Clone remote
+  repositories that are not present locally and report the state of each
+  repository.  Existing dirty repositories are left unchanged.
+
+*update* _SCOPE_::
+  Fetch existing local repositories below _SCOPE_.  Clean repositories are
+  updated to the fetched default-branch commit when remote changes are found;
+  dirty repositories are reported and left unchanged.  Repositories that have
+  not been cloned locally are skipped.
+
+*list* _SCOPE_::
+  List, in sorted order, the local and remote repositories found below
+  _SCOPE_, together with their state.
+
+*clone* _REPOSITORY_::
+  Clone one repository into its corresponding location below the configured
+  forge directory.  _REPOSITORY_ must identify a repository rather than only
+  a forge or group.
+
+*help* [_COMMAND_]::
+  Print general help or help for _COMMAND_.
+
+== Scope Formats
+
+The following forms are accepted.  The forge name or alias must exist in the
+configuration.
+
+_FORGE_:_OWNER_/_PATH_::
+  A configured forge name or alias and a group, organization, or repository
+  path, for example `github:maxaudron/gtree`.
+
+_USER_@_HOST_:_OWNER_/_PATH_[`.git`]::
+  An SSH-style Git URL, for example
+  `git@github.com:maxaudron/gtree.git`.
+
+`ssh://`_USER_@_HOST_/_OWNER_/_PATH_[`.git`]::
+  An SSH URL.
+
+`https://`[_USER_`@`]_HOST_/_OWNER_/_PATH_[`.git`]::
+  An HTTPS URL.
+
+_OWNER_/_PATH_::
+  A path relative to `settings.default_forge`.  This form fails if no default
+  forge is configured.
+
+== Options
+
+*-j, --jobs*=_JOBS_::
+  Set the number of parallel jobs.  A value of *0* selects a number
+  automatically based on the available CPUs.  The default is *0*.  This is a
+  global option and may appear before or after the subcommand.
+
+*-h, --help*::
+  Print help information.
+
+== Configuration
+
+Configuration is loaded from the *gtree* directory below the platform's XDG
+configuration home.  On a typical Unix system this is
+`$XDG_CONFIG_HOME/gtree`, or `$HOME/.config/gtree` when
+`XDG_CONFIG_HOME` is unset.
+
+*config.toml*::
+  Primary TOML configuration file.
+
+Environment variables beginning with `GTREE_` are merged after the files and
+therefore have the highest precedence.
+
+Each configured forge supplies its type, API host and token, local directory,
+Git author identity, and optional SSH host keys.  Aliases may be defined for
+forge names, and `settings.default_forge` enables scopes without a forge
+prefix.
+
+== Environment
+
+*GTREE_*::
+  Override configuration values.  Environment values take precedence over
+  both configuration files.
+
+*RUST_LOG*::
+  Set tracing directives used by *gtree*, for example `gtree=debug`.
+
+*XDG_CONFIG_HOME*::
+  Set the base directory in which *gtree* looks for its configuration
+  directory.
+
+*HOME*::
+  Used by XDG directory resolution and as the base for relative forge
+  directories.
+
+== Examples
+
+Synchronize all repositories in a GitLab group using a configured alias:
+
+....
+$ gtree sync gitlab:example/platform
+....
+
+Update repositories in a GitHub organization, using four parallel jobs:
+
+....
+$ gtree update --jobs 4 github:example
+....
+
+List repositories using the configured default forge:
+
+....
+$ gtree list example/platform
+....
+
+Clone one repository from an SSH URL:
+
+....
+$ gtree clone git@github.com:maxaudron/gtree.git
+....
+
+== Exit Status
+
+*0*::
+  The command completed without a top-level error.  Individual repository
+  errors from batch operations may still be printed in the command output.
+
+non-zero::
+  Command-line parsing, configuration loading, scope resolution, forge access,
+  or repository setup failed.
+
+== Resources
+
+*Project repositories:*
+
+* https://git.vapor.systems/gtree
+* https://codeberg.org/maxaudron/gtree
+* https://github.com/maxaudron/gtree
+* https://gitlab.com/cocainefarm/gtree
+
+== Authors
+
+*gtree* was written by Max Audron <me@audron.dev>.
+
+== Copying
+
+*gtree* is distributed under the terms of the ISC License.
