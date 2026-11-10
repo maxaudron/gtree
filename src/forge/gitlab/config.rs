@@ -5,6 +5,7 @@ use crate::config::{ForgeConfigTrait, GenericForgeConfig};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Deserialize, Serialize)]
 pub struct Config {
+    #[serde(default = "default_host")]
     pub host: String,
     pub token: String,
     #[serde(deserialize_with = "Config::deserialize_dir")]
@@ -16,6 +17,10 @@ pub struct Config {
 
     #[serde(flatten)]
     pub generic: GenericForgeConfig,
+}
+
+fn default_host() -> String {
+    String::from("gitlab.com")
 }
 
 const fn default_tls() -> bool {
